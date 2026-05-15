@@ -38,18 +38,16 @@ async function getTaskCalendar(): Promise<{ calendar: DAVCalendar; headers: Reco
       console.log(`[reminders]   "${cal.displayName ?? '(no name)'}" | components: ${JSON.stringify(cal.components)} | url: ${cal.url}`);
     }
 
-    // Only consider VTODO-capable lists, skip any with emoji in the name
-    const hasEmoji = (s: string | Record<string, unknown>) =>
-      typeof s === 'string' && /\p{Emoji_Presentation}|\p{Extended_Pictographic}/u.test(s);
     const vtodoLists = calendars.filter(cal =>
-      Array.isArray(cal.components) &&
-      cal.components.includes('VTODO') &&
-      !hasEmoji(cal.displayName ?? '')
+      Array.isArray(cal.components) && cal.components.includes('VTODO')
     );
 
-    const named = (name: string) => vtodoLists.find(cal => cal.displayName === name);
+    // Match by name prefix in case Apple appends emoji (e.g. "Reminders ⚠️")
+    const named = (name: string) => vtodoLists.find(cal =>
+      typeof cal.displayName === 'string' && cal.displayName.startsWith(name)
+    );
     cachedCalendar = named('Reminders') ?? named('Inbox') ?? vtodoLists[0] ?? null;
-    if (!cachedCalendar) throw new Error('[reminders] no suitable VTODO calendar found on iCloud account');
+    if (!cachedCalendar) throw new Error('[reminders] no VTODO calendar found on iCloud account');
     console.log(`[reminders] selected: "${cachedCalendar.displayName ?? '(no name)'}" | ${cachedCalendar.url}`);
   }
 
