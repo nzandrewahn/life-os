@@ -1,0 +1,24 @@
+{
+  "name": "life-os",
+  "version": "1.0.0",
+  "description": "Caterina — personal Telegram AI assistant",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.37.0",
+    "@supabase/supabase-js": "^2.47.0",
+    "axios": "^1.16.1",
+    "dotenv": "^16.4.7",
+    "groq-sdk": "^1.2.0",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
