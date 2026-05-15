@@ -15,28 +15,35 @@ const webhookBase =
 
 const bot = createBot();
 const app = express();
+
+// Middleware — must be before routes
 app.use(express.json());
 
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+// Health check
+app.get('/health', (_req, res) => res.send('ok'));
 
-async function start() {
+// Webhook endpoint
+app.post('/webhook', (req, res) => {
+  console.log('[webhook] received update');
+  bot.handleUpdate(req.body, res);
+});
+
+// Start Express first, then configure bot mode
+app.listen(PORT, async () => {
+  console.log(`[startup] express listening on port ${PORT}`);
+
   if (webhookBase) {
     const webhookUrl = `${webhookBase}/webhook`;
-    console.log(`[startup] webhook mode — setting webhook to ${webhookUrl}`);
+    console.log(`[startup] webhook mode — registering ${webhookUrl}`);
     await bot.telegram.setWebhook(webhookUrl);
-    console.log('[startup] webhook set');
-    app.post('/webhook', (req, res) => bot.handleUpdate(req.body, res));
-    app.listen(PORT, () => console.log(`[startup] express listening on port ${PORT}`));
+    console.log('[startup] webhook registered');
   } else {
     console.log('[startup] polling mode — clearing any existing webhook');
     await bot.telegram.deleteWebhook();
-    console.log('[startup] webhook cleared, starting polling');
-    app.listen(PORT, () => console.log(`[startup] express listening on port ${PORT}`));
+    console.log('[startup] starting polling');
     await bot.launch({ allowedUpdates: ['message'] });
   }
-}
-
-start().catch(console.error);
+});
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
