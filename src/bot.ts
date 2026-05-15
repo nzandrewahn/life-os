@@ -9,7 +9,16 @@ import type { Classification } from './capture/classify';
 
 const ALLOWED_CHAT_ID = process.env.TELEGRAM_CHAT_ID!;
 
-// In-memory pending state for low-confidence captures awaiting user clarification
+const CAPTURE_TRIGGERS = [
+  'save', 'note', 'capture', 'remember',
+  'add task', 'add to', 'file this', 'log this',
+];
+
+function isCaptureIntent(text: string): boolean {
+  const lower = text.toLowerCase();
+  return CAPTURE_TRIGGERS.some(trigger => lower.includes(trigger));
+}
+
 interface PendingCapture {
   classification: Classification;
   originalMessage: string;
@@ -22,24 +31,21 @@ export function createBot(): Telegraf {
   bot.on(message('text'), async (ctx) => {
     const chatId = String(ctx.chat.id);
     if (chatId !== ALLOWED_CHAT_ID) return;
-
     const text = ctx.message.text;
-    if (text.startsWith('/')) return; // skip commands
-
+    if (text.startsWith('/')) return;
     await handleIncoming(ctx, chatId, text, 'text');
   });
 
   bot.on(message('voice'), async (ctx) => {
     const chatId = String(ctx.chat.id);
     if (chatId !== ALLOWED_CHAT_ID) return;
-
     try {
       await ctx.sendChatAction('typing');
       const transcript = await transcribeVoice(ctx.message.voice.file_id);
-      console.log(`[${ts()}] Voice → "${transcript}"`);
+      console.log(`[${ts()}] voice → "${transcript}"`);
       await handleIncoming(ctx, chatId, transcript, 'voice', `heard: ${escapeHtml(transcript)}\n\n`);
     } catch (err) {
-      console.error('Transcription error:', err);
+      console.error('transcription error:', err);
       await ctx.reply('could not transcribe. please try again.');
     }
   });
@@ -64,7 +70,7 @@ async function handleIncoming(
 
     let agentReply: string;
 
-    // If there's a pending clarification, this message is the user's answer
+    // Resolve pending capture clarification first
     const pendingCapture = pending.get(chatId);
     if (pendingCapture) {
       pending.delete(chatId);
@@ -74,7 +80,9 @@ async function handleIncoming(
         pendingCapture.classification,
         history
       );
-    } else {
+    } else if (contentType === 'voice' || isCaptureIntent(userMessage)) {
+      // Voice always captures; text only if explicit intent
+      console.log(`[${ts()}] routing to capture pipeline`);
       const result = await runCapturePipeline(userMessage, history, contentType);
 
       if (result.type === 'clarify') {
@@ -84,13 +92,17 @@ async function handleIncoming(
       }
 
       agentReply = result.message;
+    } else {
+      // Default: conversational agent loop
+      console.log(`[${ts()}] routing to agent loop`);
+      agentReply = await runAgentLoop(userMessage, history);
     }
 
     await logMessage(chatId, 'assistant', agentReply);
     await ctx.reply(replyPrefix + formatForTelegram(agentReply), { parse_mode: 'HTML' });
-    console.log(`[${ts()}] Caterina: ${agentReply.slice(0, 80)}...`);
+    console.log(`[${ts()}] caterina: ${agentReply.slice(0, 80)}...`);
   } catch (err) {
-    console.error('Error:', err);
+    console.error('error:', err);
     await ctx.reply('something went wrong. please try again.');
   }
 }
