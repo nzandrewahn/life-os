@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { createBot } from './bot';
+import { startCrons } from './crons';
 
 console.log('[env] NODE_ENV:', process.env.NODE_ENV);
 console.log('[env] RAILWAY_URL:', process.env.RAILWAY_URL);
@@ -28,6 +29,7 @@ app.post('/webhook', (req, res) => {
 
 app.listen(Number(PORT), '0.0.0.0', async () => {
   console.log(`[startup] express listening on port ${PORT} (0.0.0.0)`);
+  startCrons(bot.telegram);
 
   if (webhookBase) {
     const webhookUrl = `${webhookBase}/webhook`;
