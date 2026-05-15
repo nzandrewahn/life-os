@@ -12,7 +12,7 @@ focused on physical objects, brand worlds, and experiential design (Lost Marbles
 with aspirations toward large-scale kinetic installations in the vein
 of Gentle Monster. Whilst also running a global home decor brand (Abstracted Objects) that's doing pop-up activations globally and selling out. Currently in an early-career building phase —
 keeping expenses low living at home, with a medium-term plan to
-relocate to Kuala Lumpur (SEA) for cost arbitrage and manufacturing
+relocate to Vietnam for cost arbitrage and manufacturing
 proximity, and an eventual presence in Sydney or Seoul. 
 
 ---
