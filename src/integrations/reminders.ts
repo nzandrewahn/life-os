@@ -1,51 +1,67 @@
-import { DAVClient, type DAVCalendar } from 'tsdav';
+import {
+  createAccount,
+  fetchCalendars,
+  createCalendarObject,
+  getBasicAuthHeaders,
+  type DAVAccount,
+  type DAVCalendar,
+} from 'tsdav';
 import { randomUUID } from 'crypto';
 
-let client: DAVClient | null = null;
+let account: DAVAccount | null = null;
 let taskCalendar: DAVCalendar | null = null;
 
-async function getClient(): Promise<DAVClient> {
-  if (client) return client;
+function getCredentials() {
+  const username = process.env.ICLOUD_USERNAME;
+  const password = process.env.ICLOUD_APP_PASSWORD;
+  if (!username) throw new Error('[reminders] ICLOUD_USERNAME is not set');
+  if (!password) throw new Error('[reminders] ICLOUD_APP_PASSWORD is not set');
+  return { username, password };
+}
 
-  console.log('[reminders] initialising DAVClient');
-  console.log('[reminders] username:', process.env.ICLOUD_USERNAME);
-  console.log('[reminders] password set:', !!process.env.ICLOUD_APP_PASSWORD);
+async function getAccount(): Promise<{ account: DAVAccount; headers: Record<string, string> }> {
+  if (account) {
+    const { username, password } = getCredentials();
+    return { account, headers: getBasicAuthHeaders({ username, password }) };
+  }
 
-  const c = new DAVClient({
-    serverUrl: 'https://caldav.icloud.com',
-    credentials: {
-      username: process.env.ICLOUD_USERNAME!,
-      password: process.env.ICLOUD_APP_PASSWORD!,
-    },
-    authMethod: 'Basic',
-    defaultAccountType: 'caldav',
-  });
+  const { username, password } = getCredentials();
+  const headers = getBasicAuthHeaders({ username, password });
+  const principalUrl = `https://caldav.icloud.com/${username}/principal/`;
+
+  console.log('[reminders] creating account, principalUrl:', principalUrl);
 
   try {
-    console.log('[reminders] calling client.login()');
-    await c.login();
-    console.log('[reminders] login successful');
-    client = c;
-    return client;
+    account = await createAccount({
+      account: {
+        serverUrl: 'https://caldav.icloud.com',
+        accountType: 'caldav',
+        credentials: { username, password },
+        principalUrl,
+      },
+      headers,
+    });
+    console.log('[reminders] account created, homeUrl:', account.homeUrl);
+    return { account, headers };
   } catch (err) {
-    console.error('[reminders] login failed:', err instanceof Error ? err.message : err);
+    console.error('[reminders] createAccount failed:', err instanceof Error ? err.message : err);
     if (err instanceof Error) console.error('[reminders] stack:', err.stack);
     throw err;
   }
 }
 
-async function getTaskCalendar(): Promise<DAVCalendar> {
-  if (taskCalendar) return taskCalendar;
+async function getTaskCalendar(): Promise<{ calendar: DAVCalendar; headers: Record<string, string> }> {
+  const { account: acc, headers } = await getAccount();
 
-  const c = await getClient();
+  if (taskCalendar) return { calendar: taskCalendar, headers };
 
   let calendars: DAVCalendar[];
   try {
     console.log('[reminders] fetching calendars');
-    calendars = await c.fetchCalendars();
-    console.log(`[reminders] found ${calendars.length} calendar(s)`);
+    calendars = await fetchCalendars({ account: acc, headers });
+    console.log(`[reminders] found ${calendars.length} calendar(s):`);
     for (const cal of calendars) {
-      console.log(`[reminders]   - "${cal.displayName ?? '(no name)'}" | url: ${cal.url} | components: ${JSON.stringify(cal.components)}`);
+      console.log(`[reminders]   "${cal.displayName ?? '(no name)'}" | components: ${JSON.stringify(cal.components)} | url: ${cal.url}`);
     }
   } catch (err) {
     console.error('[reminders] fetchCalendars failed:', err instanceof Error ? err.message : err);
@@ -53,6 +69,7 @@ async function getTaskCalendar(): Promise<DAVCalendar> {
     throw err;
   }
 
+  // Reminders lists support VTODO; regular calendars support VEVENT
   const vtodoCal = calendars.find(cal =>
     Array.isArray(cal.components) && cal.components.includes('VTODO')
   );
@@ -60,9 +77,9 @@ async function getTaskCalendar(): Promise<DAVCalendar> {
 
   if (!chosen) throw new Error('[reminders] no calendars found on iCloud account');
 
-  console.log(`[reminders] selected calendar: "${chosen.displayName ?? '(no name)'}" | ${chosen.url}`);
+  console.log(`[reminders] selected: "${chosen.displayName ?? '(no name)'}" | ${chosen.url}`);
   taskCalendar = chosen;
-  return taskCalendar;
+  return { calendar: taskCalendar, headers };
 }
 
 export async function testConnection(): Promise<void> {
@@ -71,8 +88,7 @@ export async function testConnection(): Promise<void> {
     await getTaskCalendar();
     console.log('[reminders] --- connection test passed ---');
   } catch (err) {
-    console.error('[reminders] --- connection test FAILED ---');
-    console.error('[reminders]', err instanceof Error ? err.message : err);
+    console.error('[reminders] --- connection test FAILED:', err instanceof Error ? err.message : err, '---');
   }
 }
 
@@ -81,8 +97,7 @@ export async function createReminder(params: {
   dueDate?: Date;
   notes?: string;
 }): Promise<void> {
-  const c = await getClient();
-  const cal = await getTaskCalendar();
+  const { calendar, headers } = await getTaskCalendar();
   const uid = randomUUID();
   const now = toIcalDate(new Date());
 
@@ -103,11 +118,12 @@ export async function createReminder(params: {
   lines.push('END:VTODO', 'END:VCALENDAR');
 
   try {
-    console.log(`[reminders] creating reminder: "${params.title}"`);
-    await c.createCalendarObject({
-      calendar: cal,
+    console.log(`[reminders] creating: "${params.title}"`);
+    await createCalendarObject({
+      calendar,
       filename: `${uid}.ics`,
       iCalString: lines.join('\r\n'),
+      headers,
     });
     console.log(`[reminders] created: "${params.title}"`);
   } catch (err) {
