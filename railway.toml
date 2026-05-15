@@ -1,2 +1,2 @@
 [deploy]
-startCommand = "npm run build && npm start"
+startCommand = "npm start"

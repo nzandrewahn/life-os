@@ -5,8 +5,8 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js"
+    "build": "echo 'no build step needed'",
+    "start": "node --max-old-space-size=460 -r tsx/cjs src/index.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
@@ -17,12 +17,12 @@
     "googleapis": "^171.4.0",
     "groq-sdk": "^1.2.0",
     "telegraf": "^4.16.3",
-    "tsdav": "^2.2.2"
+    "tsdav": "^2.2.2",
+    "tsx": "^4.19.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
-    "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }
 }
