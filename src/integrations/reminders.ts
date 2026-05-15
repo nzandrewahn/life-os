@@ -38,11 +38,18 @@ async function getTaskCalendar(): Promise<{ calendar: DAVCalendar; headers: Reco
       console.log(`[reminders]   "${cal.displayName ?? '(no name)'}" | components: ${JSON.stringify(cal.components)} | url: ${cal.url}`);
     }
 
-    const vtodoCal = calendars.find(cal =>
-      Array.isArray(cal.components) && cal.components.includes('VTODO')
+    // Only consider VTODO-capable lists, skip any with emoji in the name
+    const hasEmoji = (s: string | Record<string, unknown>) =>
+      typeof s === 'string' && /\p{Emoji_Presentation}|\p{Extended_Pictographic}/u.test(s);
+    const vtodoLists = calendars.filter(cal =>
+      Array.isArray(cal.components) &&
+      cal.components.includes('VTODO') &&
+      !hasEmoji(cal.displayName ?? '')
     );
-    cachedCalendar = vtodoCal ?? calendars[0] ?? null;
-    if (!cachedCalendar) throw new Error('[reminders] no calendars found on iCloud account');
+
+    const named = (name: string) => vtodoLists.find(cal => cal.displayName === name);
+    cachedCalendar = named('Reminders') ?? named('Inbox') ?? vtodoLists[0] ?? null;
+    if (!cachedCalendar) throw new Error('[reminders] no suitable VTODO calendar found on iCloud account');
     console.log(`[reminders] selected: "${cachedCalendar.displayName ?? '(no name)'}" | ${cachedCalendar.url}`);
   }
 
