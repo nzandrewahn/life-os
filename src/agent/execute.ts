@@ -41,100 +41,69 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
 
 async function readNotionTasks(input: ToolInput) {
   const date = (input.date as string) ?? new Date().toISOString().split('T')[0];
-  return {
-    date,
-    tasks: [
-      {
-        id: 'mock-task-1',
-        title: 'Finalise logo directions',
-        project: 'Abstracted Objects',
-        effort: 'High',
-        time_estimate: 2,
-        priority: 'High',
-        status: 'In progress',
-        why: 'Gates the rest of the visual identity work',
-        due: null,
-      },
-      {
-        id: 'mock-task-2',
-        title: 'Complete cloth shader study',
-        project: 'Blender',
-        effort: 'Medium',
-        time_estimate: 1,
-        priority: 'Normal',
-        status: 'Not started',
-        why: 'Building toward procedural material fluency',
-        due: null,
-      },
-    ],
-  };
+  const query = supabase
+    .from('project_tasks')
+    .select('id, title, project, effort, time_estimate, priority, status, why, due_date')
+    .neq('status', 'done')
+    .order('priority', { ascending: true });
+  if (input.project) query.eq('project', input.project as string);
+  const { data, error } = await query;
+  if (error) throw new Error(`project_tasks query failed: ${error.message}`);
+  return { date, tasks: data ?? [] };
 }
 
 async function writeNotionTask(input: ToolInput) {
-  return {
-    success: true,
-    id: `mock-task-${Date.now()}`,
+  const { data, error } = await supabase.from('project_tasks').insert({
     title: input.title,
     project: input.project,
-    message: `Task "${input.title}" created in ${input.project}`,
-  };
+    effort: input.effort ?? null,
+    time_estimate: input.time_estimate ?? null,
+    priority: input.priority ?? 'Normal',
+    why: input.why ?? null,
+    due_date: input.due ?? null,
+    status: 'Not started',
+  }).select('id').single();
+  if (error) throw new Error(`project_tasks insert failed: ${error.message}`);
+  return { success: true, id: data.id, title: input.title, project: input.project, message: `task "${input.title}" created` };
 }
 
 async function readNotionProject(input: ToolInput) {
-  return {
-    name: input.project,
-    phase: 'Phase 2 — Visual identity',
-    status: 'Active',
-    goal: 'Complete rebrand including logo, colour system, and type hierarchy',
-    last_updated: new Date().toISOString().split('T')[0],
-    open_tasks: 3,
-  };
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('name', input.project as string)
+    .maybeSingle();
+  if (error) throw new Error(`projects query failed: ${error.message}`);
+  if (!data) return { found: false, message: `no project named "${input.project}" in database` };
+  return { found: true, ...data };
 }
 
 async function readNotionPrograms(input: ToolInput) {
   const date = (input.date as string) ?? new Date().toISOString().split('T')[0];
   return {
     date,
-    training: {
-      session: 'Upper body push',
-      duration_minutes: 60,
-      notes: '+ 20 min zone 2 cardio after',
-    },
-    sketching: {
-      session: 'Timed figure sketches',
-      exercises: '10 × 2min gestures',
-      notes: 'Focus on line economy',
-    },
+    training: 'no program set up yet',
+    sketching: 'no program set up yet',
   };
 }
 
 async function writeNotionInspiration(input: ToolInput) {
   return {
-    success: true,
-    id: `mock-inspiration-${Date.now()}`,
-    url: input.url,
-    title: input.title ?? 'Untitled',
-    message: `Archived to Notion inspiration — ${input.category}`,
+    success: false,
+    message: 'Notion inspiration database not connected yet — save the URL to Obsidian instead using write_obsidian_note with folder 2.Notes/Learnings',
   };
 }
 
 async function readSupabaseHistory(input: ToolInput) {
   const days = (input.days as number) ?? 3;
-  return {
-    days_requested: days,
-    messages: [
-      {
-        role: 'user',
-        content: 'energy 7, got about 4 hours today',
-        created_at: new Date(Date.now() - 86400000).toISOString(),
-      },
-      {
-        role: 'assistant',
-        content: 'filed. focusing on logo directions and cloth shader today.',
-        created_at: new Date(Date.now() - 86400000 + 1000).toISOString(),
-      },
-    ],
-  };
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('messages')
+    .select('role, content, created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(`messages query failed: ${error.message}`);
+  return { days_requested: days, messages: data ?? [] };
 }
 
 async function writeSupabaseCapture(input: ToolInput) {
