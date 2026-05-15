@@ -1,5 +1,8 @@
+import { createClient } from '@supabase/supabase-js';
 import { buildNote, readNote, writeNote, appendToNote } from '../integrations/obsidian';
 import { queryIndex, insertIndex } from '../memory/obsidian-index';
+
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
 type ToolInput = Record<string, unknown>;
 
@@ -124,13 +127,17 @@ async function readSupabaseHistory(input: ToolInput) {
 }
 
 async function writeSupabaseCapture(input: ToolInput) {
-  return {
-    success: true,
-    id: `mock-capture-${Date.now()}`,
+  const { error } = await supabase.from('captures').insert({
+    raw_content: input.raw_content,
+    content_type: input.content_type,
+    summary: input.summary ?? null,
     classification: input.classification,
+    project: input.project ?? null,
     routed_to: input.routed_to,
-    message: 'Capture logged',
-  };
+    reviewed: false,
+  });
+  if (error) throw new Error(`captures insert: ${error.message}`);
+  return { success: true, message: 'capture logged' };
 }
 
 async function writeSupabaseLifeTask(input: ToolInput) {
