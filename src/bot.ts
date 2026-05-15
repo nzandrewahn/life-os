@@ -80,8 +80,8 @@ async function handleIncoming(
         pendingCapture.classification,
         history
       );
-    } else if (contentType === 'voice' || isCaptureIntent(userMessage)) {
-      // Voice always captures; text only if explicit intent
+    } else if (isCaptureIntent(userMessage)) {
+      // Only route to capture if message contains explicit trigger keywords
       console.log(`[${ts()}] routing to capture pipeline`);
       const result = await runCapturePipeline(userMessage, history, contentType);
 
