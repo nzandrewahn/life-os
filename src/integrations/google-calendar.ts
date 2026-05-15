@@ -34,12 +34,19 @@ function formatAuckland(iso: string): string {
 
 function getAuth(writeAccess = false) {
   const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  console.log('[calendar] GOOGLE_SERVICE_ACCOUNT_JSON defined:', !!json);
+  console.log('[calendar] raw value length:', json?.length ?? 0);
+
   if (!json) throw new Error('[google-calendar] GOOGLE_SERVICE_ACCOUNT_JSON is not set');
 
   let credentials: Record<string, unknown>;
   try {
     credentials = JSON.parse(json);
-  } catch {
+    console.log('[calendar] credentials type:', credentials.type);
+    console.log('[calendar] client_email:', credentials.client_email);
+  } catch (e) {
+    console.log('[calendar] JSON parse error:', e instanceof Error ? e.message : e);
+    console.log('[calendar] first 100 chars of raw value:', json.slice(0, 100));
     throw new Error('[google-calendar] GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON — check for unescaped newlines or quotes');
   }
 
@@ -47,11 +54,20 @@ function getAuth(writeAccess = false) {
     ? ['https://www.googleapis.com/auth/calendar']
     : ['https://www.googleapis.com/auth/calendar.readonly'];
 
-  return new google.auth.GoogleAuth({ credentials, scopes });
+  try {
+    const auth = new google.auth.GoogleAuth({ credentials, scopes });
+    console.log('[calendar] GoogleAuth created successfully');
+    return auth;
+  } catch (e) {
+    console.log('[calendar] GoogleAuth setup error:', e instanceof Error ? e.message : e);
+    if (e instanceof Error) console.log('[calendar] stack:', e.stack);
+    throw e;
+  }
 }
 
 function getCalendarId(): string {
   const id = process.env.GOOGLE_CALENDAR_ID;
+  console.log('[calendar] GOOGLE_CALENDAR_ID:', id ?? '(not set)');
   if (!id) throw new Error('[google-calendar] GOOGLE_CALENDAR_ID is not set');
   return id;
 }
