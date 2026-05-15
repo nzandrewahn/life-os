@@ -398,6 +398,26 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'update_context',
+    description:
+      'Persist an important fact learned through conversation that should be remembered permanently beyond the 14-day message history window. Use when Andrew mentions something significant that changes his situation — a new client, a location change, a business decision, a major life update. Do NOT use for tasks or fleeting thoughts — those go to Supabase or Obsidian. Appends to context-updates.md with a timestamp.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        fact: {
+          type: 'string',
+          description: 'The fact to persist, written in third person (e.g. "Andrew is moving to Sydney in June").',
+        },
+        category: {
+          type: 'string',
+          enum: ['situation', 'business', 'personal', 'financial'],
+          description: 'Category of the update.',
+        },
+      },
+      required: ['fact', 'category'],
+    },
+  },
+  {
     name: 'fetch_url',
     description:
       'Fetch and summarise a URL — works for YouTube videos, articles, and web pages. Returns the title, description, and a one-paragraph summary of the content. Call this whenever the user sends a link before routing it to the inspiration archive or creating a reference note.',

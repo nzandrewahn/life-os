@@ -1,5 +1,7 @@
 import { Telegraf, type Context } from 'telegraf';
 import { message } from 'telegraf/filters';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { runAgentLoop } from './agent/loop';
 import { logMessage, getRecentHistory } from './db';
 import { transcribeVoice } from './integrations/groq';
@@ -27,6 +29,20 @@ const pending = new Map<string, PendingCapture>();
 
 export function createBot(): Telegraf {
   const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
+
+  bot.command('updatecontext', async (ctx) => {
+    if (String(ctx.chat.id) !== ALLOWED_CHAT_ID) return;
+    try {
+      const content = readFileSync(join(process.cwd(), 'context-updates.md'), 'utf-8').trim();
+      if (!content) {
+        await ctx.reply('context-updates.md is empty.');
+      } else {
+        await ctx.reply(`<pre>${escapeHtml(content)}</pre>`, { parse_mode: 'HTML' });
+      }
+    } catch {
+      await ctx.reply('context-updates.md not found.');
+    }
+  });
 
   bot.on(message('text'), async (ctx) => {
     const chatId = String(ctx.chat.id);

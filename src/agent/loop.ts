@@ -9,11 +9,19 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MAX_ITERATIONS = 10;
 
 function loadSystemPrompt(): string {
+  let base: string;
   try {
-    return readFileSync(join(process.cwd(), 'system-prompt.md'), 'utf-8');
+    base = readFileSync(join(process.cwd(), 'system-prompt.md'), 'utf-8');
   } catch {
-    return 'You are Caterina, a personal AI assistant. Rules: all lowercase, no markdown, no headers, no bullet asterisks, under 10 words where possible, no filler phrases, no motivational language.';
+    base = 'You are Caterina, a personal AI assistant. Rules: all lowercase, no markdown, no headers, no bullet asterisks, under 10 words where possible, no filler phrases, no motivational language.';
   }
+  try {
+    const updates = readFileSync(join(process.cwd(), 'context-updates.md'), 'utf-8');
+    if (updates.trim()) return `${base}\n\n## dynamic context updates\n\n${updates}`;
+  } catch {
+    // file doesn't exist yet — skip silently
+  }
+  return base;
 }
 
 export async function runAgentLoop(

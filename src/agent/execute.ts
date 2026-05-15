@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { appendFileSync, existsSync } from 'fs';
+import { join } from 'path';
 import { buildNote, readNote, writeNote, appendToNote } from '../integrations/obsidian';
 import { queryIndex, insertIndex } from '../memory/obsidian-index';
 import { createReminder as iCloudCreateReminder } from '../integrations/reminders';
@@ -32,6 +34,7 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
     case 'create_calendar_event':    return execCreateCalendarEvent(input);
     case 'update_calendar_event':    return execUpdateCalendarEvent(input);
     case 'delete_calendar_event':    return execDeleteCalendarEvent(input);
+    case 'update_context':           return execUpdateContext(input);
     case 'fetch_url':                return fetchUrl(input);
     case 'transcribe_audio':         return transcribeAudio(input);
     default:
@@ -234,6 +237,16 @@ async function execDeleteCalendarEvent(input: ToolInput) {
   }
   await deleteCalendarEvent(input.event_id as string);
   return { success: true, message: `Event ${input.event_id} deleted` };
+}
+
+async function execUpdateContext(input: ToolInput) {
+  const fact = input.fact as string;
+  const category = input.category as string;
+  const timestamp = new Date().toISOString().split('T')[0];
+  const entry = `[${timestamp}] [${category}] ${fact}\n`;
+  const filePath = join(process.cwd(), 'context-updates.md');
+  appendFileSync(filePath, entry, 'utf-8');
+  return { success: true, message: `context updated: ${fact}` };
 }
 
 async function fetchUrl(input: ToolInput) {
