@@ -169,6 +169,33 @@ export async function updateCalendarEvent(params: {
 
 export async function deleteCalendarEvent(eventId: string): Promise<void> {
   const calendarId = getCalendarId();
+  console.log('[calendar] deleting event ID:', eventId);
+  console.log('[calendar] calendar ID:', calendarId);
+
   const cal = google.calendar({ version: 'v3', auth: getAuth(true) });
-  await cal.events.delete({ calendarId, eventId });
+
+  const res = await cal.events.delete({
+    calendarId,
+    eventId,
+    sendUpdates: 'none',
+  });
+  console.log('[calendar] delete response status:', res.status);
+  console.log('[calendar] delete response headers:', JSON.stringify(res.headers));
+
+  // Verify the deletion — a successful delete returns 204 and the event should no longer be fetchable
+  try {
+    const check = await cal.events.get({ calendarId, eventId });
+    // If we get here, the event still exists
+    const status = check.data.status;
+    if (status === 'cancelled') {
+      console.log('[calendar] event marked cancelled (soft delete) — expected for some calendar types');
+    } else {
+      console.error('[calendar] event still exists after delete, status:', status);
+      throw new Error(`[google-calendar] delete appeared to succeed but event ${eventId} still exists (status: ${status})`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('still exists')) throw e;
+    // 404/410 means the event is gone — expected success path
+    console.log('[calendar] post-delete fetch threw (event is gone):', e instanceof Error ? e.message : e);
+  }
 }
