@@ -320,6 +320,21 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'read_google_calendar',
+    description:
+      'Read events from Google Calendar for today and the next N days. Use this when the user asks what is on their calendar, what they have planned, or during morning briefs. Returns event titles, start/end times, and locations.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        days: {
+          type: 'number',
+          description: 'Number of days ahead to fetch, including today. Default 7.',
+        },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'fetch_url',
     description:
       'Fetch and summarise a URL — works for YouTube videos, articles, and web pages. Returns the title, description, and a one-paragraph summary of the content. Call this whenever the user sends a link before routing it to the inspiration archive or creating a reference note.',

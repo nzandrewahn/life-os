@@ -8,31 +8,23 @@ import {
 } from 'tsdav';
 import { randomUUID } from 'crypto';
 
-let account: DAVAccount | null = null;
-let taskCalendar: DAVCalendar | null = null;
+// Cached per process lifetime — reset to null if credentials change
+let cachedAccount: DAVAccount | null = null;
+let cachedCalendar: DAVCalendar | null = null;
 
-function getCredentials() {
+async function getTaskCalendar(): Promise<{ calendar: DAVCalendar; headers: Record<string, string> }> {
+  // Read credentials at call time — never at module load
   const username = process.env.ICLOUD_USERNAME;
   const password = process.env.ICLOUD_APP_PASSWORD;
   if (!username) throw new Error('[reminders] ICLOUD_USERNAME is not set');
   if (!password) throw new Error('[reminders] ICLOUD_APP_PASSWORD is not set');
-  return { username, password };
-}
 
-async function getAccount(): Promise<{ account: DAVAccount; headers: Record<string, string> }> {
-  if (account) {
-    const { username, password } = getCredentials();
-    return { account, headers: getBasicAuthHeaders({ username, password }) };
-  }
-
-  const { username, password } = getCredentials();
   const headers = getBasicAuthHeaders({ username, password });
-  const principalUrl = `https://caldav.icloud.com/${username}/principal/`;
 
-  console.log('[reminders] creating account, principalUrl:', principalUrl);
-
-  try {
-    account = await createAccount({
+  if (!cachedAccount) {
+    const principalUrl = `https://caldav.icloud.com/${username}/principal/`;
+    console.log('[reminders] creating account, principalUrl:', principalUrl);
+    cachedAccount = await createAccount({
       account: {
         serverUrl: 'https://caldav.icloud.com',
         accountType: 'caldav',
@@ -41,55 +33,25 @@ async function getAccount(): Promise<{ account: DAVAccount; headers: Record<stri
       },
       headers,
     });
-    console.log('[reminders] account created, homeUrl:', account.homeUrl);
-    return { account, headers };
-  } catch (err) {
-    console.error('[reminders] createAccount failed:', err instanceof Error ? err.message : err);
-    if (err instanceof Error) console.error('[reminders] stack:', err.stack);
-    throw err;
+    console.log('[reminders] account ready, homeUrl:', cachedAccount.homeUrl);
   }
-}
 
-async function getTaskCalendar(): Promise<{ calendar: DAVCalendar; headers: Record<string, string> }> {
-  const { account: acc, headers } = await getAccount();
-
-  if (taskCalendar) return { calendar: taskCalendar, headers };
-
-  let calendars: DAVCalendar[];
-  try {
+  if (!cachedCalendar) {
     console.log('[reminders] fetching calendars');
-    calendars = await fetchCalendars({ account: acc, headers });
+    const calendars = await fetchCalendars({ account: cachedAccount, headers });
     console.log(`[reminders] found ${calendars.length} calendar(s):`);
     for (const cal of calendars) {
       console.log(`[reminders]   "${cal.displayName ?? '(no name)'}" | components: ${JSON.stringify(cal.components)} | url: ${cal.url}`);
     }
-  } catch (err) {
-    console.error('[reminders] fetchCalendars failed:', err instanceof Error ? err.message : err);
-    if (err instanceof Error) console.error('[reminders] stack:', err.stack);
-    throw err;
+    const vtodoCal = calendars.find(cal =>
+      Array.isArray(cal.components) && cal.components.includes('VTODO')
+    );
+    cachedCalendar = vtodoCal ?? calendars[0];
+    if (!cachedCalendar) throw new Error('[reminders] no calendars found on iCloud account');
+    console.log(`[reminders] selected: "${cachedCalendar.displayName ?? '(no name)'}"`);
   }
 
-  // Reminders lists support VTODO; regular calendars support VEVENT
-  const vtodoCal = calendars.find(cal =>
-    Array.isArray(cal.components) && cal.components.includes('VTODO')
-  );
-  const chosen = vtodoCal ?? calendars[0];
-
-  if (!chosen) throw new Error('[reminders] no calendars found on iCloud account');
-
-  console.log(`[reminders] selected: "${chosen.displayName ?? '(no name)'}" | ${chosen.url}`);
-  taskCalendar = chosen;
-  return { calendar: taskCalendar, headers };
-}
-
-export async function testConnection(): Promise<void> {
-  console.log('[reminders] --- connection test start ---');
-  try {
-    await getTaskCalendar();
-    console.log('[reminders] --- connection test passed ---');
-  } catch (err) {
-    console.error('[reminders] --- connection test FAILED:', err instanceof Error ? err.message : err, '---');
-  }
+  return { calendar: cachedCalendar, headers };
 }
 
 export async function createReminder(params: {
@@ -97,6 +59,8 @@ export async function createReminder(params: {
   dueDate?: Date;
   notes?: string;
 }): Promise<void> {
+  console.log('[reminders] attempting with user:', process.env.ICLOUD_USERNAME?.slice(0, 5));
+
   const { calendar, headers } = await getTaskCalendar();
   const uid = randomUUID();
   const now = toIcalDate(new Date());
@@ -117,8 +81,8 @@ export async function createReminder(params: {
 
   lines.push('END:VTODO', 'END:VCALENDAR');
 
+  console.log(`[reminders] creating: "${params.title}"`);
   try {
-    console.log(`[reminders] creating: "${params.title}"`);
     await createCalendarObject({
       calendar,
       filename: `${uid}.ics`,

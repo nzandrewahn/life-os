@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { buildNote, readNote, writeNote, appendToNote } from '../integrations/obsidian';
 import { queryIndex, insertIndex } from '../memory/obsidian-index';
 import { createReminder as iCloudCreateReminder } from '../integrations/reminders';
+import { readCalendarEvents } from '../integrations/google-calendar';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
@@ -22,6 +23,7 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
     case 'update_obsidian_note':     return execUpdateObsidianNote(input);
     case 'read_obsidian_note':       return execReadObsidianNote(input);
     case 'create_reminder':          return createReminder(input);
+    case 'read_google_calendar':     return execReadGoogleCalendar(input);
     case 'fetch_url':                return fetchUrl(input);
     case 'transcribe_audio':         return transcribeAudio(input);
     default:
@@ -210,6 +212,12 @@ async function createReminder(input: ToolInput) {
 
   await iCloudCreateReminder({ title, dueDate, notes });
   return { success: true, message: `reminder "${title}" created in Apple Reminders` };
+}
+
+async function execReadGoogleCalendar(input: ToolInput) {
+  const days = (input.days as number | undefined) ?? 7;
+  const events = await readCalendarEvents(days);
+  return { days, count: events.length, events };
 }
 
 async function fetchUrl(input: ToolInput) {
