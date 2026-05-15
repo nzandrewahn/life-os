@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { buildNote, readNote, writeNote, appendToNote } from '../integrations/obsidian';
 import { queryIndex, insertIndex } from '../memory/obsidian-index';
+import { createReminder as iCloudCreateReminder } from '../integrations/reminders';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
@@ -203,12 +204,12 @@ async function execReadObsidianNote(input: ToolInput) {
 }
 
 async function createReminder(input: ToolInput) {
-  return {
-    success: true,
-    title: input.title,
-    message: `Reminder "${input.title}" created in Apple Reminders`,
-    note: '[stub] Would create via CalDAV in Phase 4',
-  };
+  const title = input.title as string;
+  const dueDate = input.due_date ? new Date(input.due_date as string) : undefined;
+  const notes = input.notes as string | undefined;
+
+  await iCloudCreateReminder({ title, dueDate, notes });
+  return { success: true, message: `reminder "${title}" created in Apple Reminders` };
 }
 
 async function fetchUrl(input: ToolInput) {
