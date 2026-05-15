@@ -6,11 +6,30 @@ export interface CalendarEvent {
   title: string;
   start: string;
   end: string;
+  startAuckland: string;
+  endAuckland: string;
   allDay: boolean;
   location?: string;
   description?: string;
   attendees?: string[];
   htmlLink?: string;
+}
+
+const AUCKLAND_TZ = 'Pacific/Auckland';
+
+function formatAuckland(iso: string): string {
+  if (!iso) return iso;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString('en-NZ', {
+    timeZone: AUCKLAND_TZ,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
 }
 
 function getAuth(writeAccess = false) {
@@ -39,11 +58,15 @@ function getCalendarId(): string {
 
 function mapEvent(e: calendar_v3.Schema$Event): CalendarEvent {
   const allDay = !e.start?.dateTime;
+  const start = e.start?.dateTime ?? e.start?.date ?? '';
+  const end = e.end?.dateTime ?? e.end?.date ?? '';
   return {
     id: e.id ?? '',
     title: e.summary ?? '(no title)',
-    start: e.start?.dateTime ?? e.start?.date ?? '',
-    end: e.end?.dateTime ?? e.end?.date ?? '',
+    start,
+    end,
+    startAuckland: allDay ? start : formatAuckland(start),
+    endAuckland: allDay ? end : formatAuckland(end),
     allDay,
     location: e.location ?? undefined,
     description: e.description ?? undefined,

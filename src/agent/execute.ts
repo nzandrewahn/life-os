@@ -252,6 +252,9 @@ async function execUpdateCalendarEvent(input: ToolInput) {
 }
 
 async function execDeleteCalendarEvent(input: ToolInput) {
+  if (!input.confirmed) {
+    return { success: false, message: 'Deletion requires confirmed: true — ask the user to confirm first.' };
+  }
   await deleteCalendarEvent(input.event_id as string);
   return { success: true, message: `Event ${input.event_id} deleted` };
 }

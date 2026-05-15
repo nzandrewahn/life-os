@@ -322,7 +322,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'read_google_calendar',
     description:
-      'Read events from Google Calendar for today and the next N days. Use this when the user asks what is on their calendar, what they have planned, or during morning briefs. Returns event titles, start/end times, attendees, and locations.',
+      'Read events from Google Calendar for today and the next N days. Use this when the user asks about their schedule, what is on their calendar, or during morning briefs. Returns event title, start/end times in Auckland timezone (Pacific/Auckland), attendees, location, and event ID.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -337,24 +337,24 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'create_calendar_event',
     description:
-      'Create a new event in Google Calendar. Use when the user wants to schedule something, book time, or block the calendar. Always confirm start/end datetimes before creating. Returns the event ID and a link to view it.',
+      'Create a new event in Google Calendar. All times default to Pacific/Auckland timezone. Resolve natural language times (e.g. "9pm Friday") into ISO 8601 datetimes before calling. If no end time is given, default to 1 hour after start. Always echo back the resolved time to the user before creating. Returns the created event link.',
     input_schema: {
       type: 'object' as const,
       properties: {
         title: { type: 'string', description: 'Event title.' },
         start: {
           type: 'string',
-          description: 'Start datetime in ISO 8601 format with timezone offset (e.g. 2024-06-15T09:00:00+12:00).',
+          description: 'Start datetime ISO 8601 with Auckland offset, e.g. 2026-05-16T21:00:00+12:00.',
         },
         end: {
           type: 'string',
-          description: 'End datetime in ISO 8601 format with timezone offset.',
+          description: 'End datetime ISO 8601 with Auckland offset. Defaults to 1 hour after start.',
         },
-        description: { type: 'string', description: 'Optional event description or notes.' },
+        description: { type: 'string', description: 'Optional notes or agenda.' },
         attendees: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Optional list of attendee email addresses.',
+          description: 'Optional attendee email addresses.',
         },
       },
       required: ['title', 'start', 'end'],
@@ -363,19 +363,19 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'update_calendar_event',
     description:
-      'Update an existing Google Calendar event by ID. Only provide the fields you want to change — omitted fields are left as-is. Get the event ID from read_google_calendar first.',
+      'Update an existing Google Calendar event by ID. Only pass the fields to change — omitted fields are preserved. Get the event ID from read_google_calendar first. Times must be ISO 8601 with Auckland offset.',
     input_schema: {
       type: 'object' as const,
       properties: {
         event_id: { type: 'string', description: 'Google Calendar event ID.' },
         title: { type: 'string', description: 'New event title.' },
-        start: { type: 'string', description: 'New start datetime (ISO 8601 with timezone).' },
-        end: { type: 'string', description: 'New end datetime (ISO 8601 with timezone).' },
+        start: { type: 'string', description: 'New start datetime (ISO 8601 with Auckland offset).' },
+        end: { type: 'string', description: 'New end datetime (ISO 8601 with Auckland offset).' },
         description: { type: 'string', description: 'New description.' },
         attendees: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Replacement attendee list (replaces all existing attendees).',
+          description: 'Replacement attendee list (overwrites all existing attendees).',
         },
       },
       required: ['event_id'],
@@ -384,13 +384,17 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'delete_calendar_event',
     description:
-      'Delete a Google Calendar event by ID. Always confirm with the user before deleting. Get the event ID from read_google_calendar first.',
+      'Delete a Google Calendar event by ID. You MUST ask the user to confirm before calling this — pass confirmed: true only after they explicitly say yes. Get the event ID from read_google_calendar first.',
     input_schema: {
       type: 'object' as const,
       properties: {
         event_id: { type: 'string', description: 'Google Calendar event ID to delete.' },
+        confirmed: {
+          type: 'boolean',
+          description: 'Must be true — only set after the user explicitly confirms deletion.',
+        },
       },
-      required: ['event_id'],
+      required: ['event_id', 'confirmed'],
     },
   },
   {
