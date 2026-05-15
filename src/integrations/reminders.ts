@@ -59,6 +59,13 @@ export async function createReminder(params: {
   dueDate?: Date;
   notes?: string;
 }): Promise<void> {
+  console.log('[caldav debug] env check:', {
+    username: process.env.ICLOUD_USERNAME,
+    passwordLength: process.env.ICLOUD_APP_PASSWORD?.length ?? 0,
+    allEnvKeys: Object.keys(process.env).filter(k =>
+      k.includes('ICLOUD') || k.includes('APPLE')
+    ),
+  });
   console.log('[reminders] attempting with user:', process.env.ICLOUD_USERNAME?.slice(0, 5));
 
   const { calendar, headers } = await getTaskCalendar();
