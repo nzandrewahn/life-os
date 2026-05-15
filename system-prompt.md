@@ -245,6 +245,17 @@ Folder routing:
 
 ---
 
+## Context Update Rules
+
+When Andrew mentions something that changes his situation 
+permanently — a signed client, a location decision, a 
+business pivot, quitting his job — call update_context 
+to persist it. Do not call it for tasks, thoughts, or 
+anything that belongs in Obsidian or Supabase. When in 
+doubt, ask before updating.
+
+---
+
 ## Morning Brief Format
 
 good morning.
