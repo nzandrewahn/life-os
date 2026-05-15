@@ -15,7 +15,7 @@ type ToolInput = Record<string, unknown>;
 
 export async function executeTool(name: string, input: ToolInput): Promise<unknown> {
   switch (name) {
-    case 'read_notion_tasks':        return readNotionTasks(input);
+    case 'read_project_tasks':        return readProjectTasks(input);
     case 'write_notion_task':        return writeNotionTask(input);
     case 'read_notion_project':      return readNotionProject(input);
     case 'read_notion_programs':     return readNotionPrograms(input);
@@ -39,17 +39,22 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
   }
 }
 
-async function readNotionTasks(input: ToolInput) {
+const PRIORITY_RANK: Record<string, number> = { critical: 1, high: 2, normal: 3, low: 4 };
+function byPriority<T extends { priority?: string | null }>(a: T, b: T): number {
+  return (PRIORITY_RANK[(a.priority ?? '').toLowerCase()] ?? 5) -
+         (PRIORITY_RANK[(b.priority ?? '').toLowerCase()] ?? 5);
+}
+
+async function readProjectTasks(input: ToolInput) {
   const date = (input.date as string) ?? new Date().toISOString().split('T')[0];
-  const query = supabase
+  let query = supabase
     .from('project_tasks')
     .select('id, title, project, effort, time_estimate, priority, status, why, due_date')
-    .neq('status', 'done')
-    .order('priority', { ascending: true });
-  if (input.project) query.eq('project', input.project as string);
+    .neq('status', 'done');
+  if (input.project) query = query.eq('project', input.project as string);
   const { data, error } = await query;
   if (error) throw new Error(`project_tasks query failed: ${error.message}`);
-  return { date, tasks: data ?? [] };
+  return { date, tasks: (data ?? []).sort(byPriority) };
 }
 
 async function writeNotionTask(input: ToolInput) {

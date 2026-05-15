@@ -7,6 +7,11 @@ import { join } from 'path';
 import { readCalendarEvents } from '../integrations/google-calendar';
 
 const AUCKLAND = 'Pacific/Auckland';
+const PRIORITY_RANK: Record<string, number> = { critical: 1, high: 2, normal: 3, low: 4 };
+function byPriority<T extends { priority?: string | null }>(a: T, b: T): number {
+  return (PRIORITY_RANK[(a.priority ?? '').toLowerCase()] ?? 5) -
+         (PRIORITY_RANK[(b.priority ?? '').toLowerCase()] ?? 5);
+}
 
 function getSupabase() {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
@@ -57,8 +62,7 @@ async function runMorningBrief(telegram: Telegram): Promise<void> {
     supabase
       .from('project_tasks')
       .select('title, project, priority, status, due_date')
-      .neq('status', 'done')
-      .order('priority', { ascending: true }),
+      .neq('status', 'done'),
     supabase
       .from('life_tasks')
       .select('title, category, priority, due_date')
@@ -74,10 +78,12 @@ async function runMorningBrief(telegram: Telegram): Promise<void> {
     }),
   ]);
 
+  const sortedTasks = (tasks ?? []).sort(byPriority);
+
   const prompt = `generate morning brief for ${today}.
 
 project tasks (not done, ordered by priority):
-${JSON.stringify(tasks ?? [], null, 2)}
+${JSON.stringify(sortedTasks, null, 2)}
 
 today's calendar events:
 ${JSON.stringify(events, null, 2)}

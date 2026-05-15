@@ -2,9 +2,9 @@ import type Anthropic from '@anthropic-ai/sdk';
 
 export const TOOLS: Anthropic.Tool[] = [
   {
-    name: 'read_notion_tasks',
+    name: 'read_project_tasks',
     description:
-      'Read tasks from Notion for a given date, optionally filtered by project. Returns each task with title, project, effort, time estimate, priority, status, and why. Call this at the start of morning briefs, when the user asks about their workload, or when planning a day.',
+      'Read active project tasks from Supabase, ordered by priority (critical → high → normal → low). Optionally filter by project name. Returns each task with title, project, effort, time estimate, priority, status, and why. Call this at the start of morning briefs, when the user asks about their workload, or when planning a day.',
     input_schema: {
       type: 'object' as const,
       properties: {
