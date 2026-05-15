@@ -2,7 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import { buildNote, readNote, writeNote, appendToNote } from '../integrations/obsidian';
 import { queryIndex, insertIndex } from '../memory/obsidian-index';
 import { createReminder as iCloudCreateReminder } from '../integrations/reminders';
-import { readCalendarEvents } from '../integrations/google-calendar';
+import {
+  readCalendarEvents,
+  createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
+} from '../integrations/google-calendar';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
@@ -24,6 +29,9 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
     case 'read_obsidian_note':       return execReadObsidianNote(input);
     case 'create_reminder':          return createReminder(input);
     case 'read_google_calendar':     return execReadGoogleCalendar(input);
+    case 'create_calendar_event':    return execCreateCalendarEvent(input);
+    case 'update_calendar_event':    return execUpdateCalendarEvent(input);
+    case 'delete_calendar_event':    return execDeleteCalendarEvent(input);
     case 'fetch_url':                return fetchUrl(input);
     case 'transcribe_audio':         return transcribeAudio(input);
     default:
@@ -218,6 +226,34 @@ async function execReadGoogleCalendar(input: ToolInput) {
   const days = (input.days as number | undefined) ?? 7;
   const events = await readCalendarEvents(days);
   return { days, count: events.length, events };
+}
+
+async function execCreateCalendarEvent(input: ToolInput) {
+  const result = await createCalendarEvent({
+    title: input.title as string,
+    start: input.start as string,
+    end: input.end as string,
+    description: input.description as string | undefined,
+    attendees: input.attendees as string[] | undefined,
+  });
+  return { success: true, ...result, message: `Event "${input.title}" created` };
+}
+
+async function execUpdateCalendarEvent(input: ToolInput) {
+  const event = await updateCalendarEvent({
+    eventId: input.event_id as string,
+    title: input.title as string | undefined,
+    start: input.start as string | undefined,
+    end: input.end as string | undefined,
+    description: input.description as string | undefined,
+    attendees: input.attendees as string[] | undefined,
+  });
+  return { success: true, event, message: `Event "${event.title}" updated` };
+}
+
+async function execDeleteCalendarEvent(input: ToolInput) {
+  await deleteCalendarEvent(input.event_id as string);
+  return { success: true, message: `Event ${input.event_id} deleted` };
 }
 
 async function fetchUrl(input: ToolInput) {

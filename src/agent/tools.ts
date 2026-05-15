@@ -322,7 +322,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'read_google_calendar',
     description:
-      'Read events from Google Calendar for today and the next N days. Use this when the user asks what is on their calendar, what they have planned, or during morning briefs. Returns event titles, start/end times, and locations.',
+      'Read events from Google Calendar for today and the next N days. Use this when the user asks what is on their calendar, what they have planned, or during morning briefs. Returns event titles, start/end times, attendees, and locations.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -332,6 +332,65 @@ export const TOOLS: Anthropic.Tool[] = [
         },
       },
       required: [],
+    },
+  },
+  {
+    name: 'create_calendar_event',
+    description:
+      'Create a new event in Google Calendar. Use when the user wants to schedule something, book time, or block the calendar. Always confirm start/end datetimes before creating. Returns the event ID and a link to view it.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Event title.' },
+        start: {
+          type: 'string',
+          description: 'Start datetime in ISO 8601 format with timezone offset (e.g. 2024-06-15T09:00:00+12:00).',
+        },
+        end: {
+          type: 'string',
+          description: 'End datetime in ISO 8601 format with timezone offset.',
+        },
+        description: { type: 'string', description: 'Optional event description or notes.' },
+        attendees: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional list of attendee email addresses.',
+        },
+      },
+      required: ['title', 'start', 'end'],
+    },
+  },
+  {
+    name: 'update_calendar_event',
+    description:
+      'Update an existing Google Calendar event by ID. Only provide the fields you want to change — omitted fields are left as-is. Get the event ID from read_google_calendar first.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        event_id: { type: 'string', description: 'Google Calendar event ID.' },
+        title: { type: 'string', description: 'New event title.' },
+        start: { type: 'string', description: 'New start datetime (ISO 8601 with timezone).' },
+        end: { type: 'string', description: 'New end datetime (ISO 8601 with timezone).' },
+        description: { type: 'string', description: 'New description.' },
+        attendees: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Replacement attendee list (replaces all existing attendees).',
+        },
+      },
+      required: ['event_id'],
+    },
+  },
+  {
+    name: 'delete_calendar_event',
+    description:
+      'Delete a Google Calendar event by ID. Always confirm with the user before deleting. Get the event ID from read_google_calendar first.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        event_id: { type: 'string', description: 'Google Calendar event ID to delete.' },
+      },
+      required: ['event_id'],
     },
   },
   {
