@@ -19,7 +19,6 @@ async function getTaskCalendar(): Promise<{ calendar: DAVCalendar; headers: Reco
   const headers = getBasicAuthHeaders({ username, password });
 
   if (!cachedAccount) {
-    console.log('[reminders] creating account via well-known discovery');
     cachedAccount = await createAccount({
       account: {
         serverUrl: 'https://caldav.icloud.com',
@@ -30,14 +29,8 @@ async function getTaskCalendar(): Promise<{ calendar: DAVCalendar; headers: Reco
       loadCollections: true,
       loadObjects: false,
     });
-    console.log('[reminders] account ready, homeUrl:', cachedAccount.homeUrl);
 
     const calendars = cachedAccount.calendars ?? [];
-    console.log(`[reminders] found ${calendars.length} calendar(s):`);
-    for (const cal of calendars) {
-      console.log(`[reminders]   "${cal.displayName ?? '(no name)'}" | components: ${JSON.stringify(cal.components)} | url: ${cal.url}`);
-    }
-
     const vtodoLists = calendars.filter(cal =>
       Array.isArray(cal.components) && cal.components.includes('VTODO')
     );
@@ -48,7 +41,7 @@ async function getTaskCalendar(): Promise<{ calendar: DAVCalendar; headers: Reco
     );
     cachedCalendar = named('Reminders') ?? named('Inbox') ?? vtodoLists[0] ?? null;
     if (!cachedCalendar) throw new Error('[reminders] no VTODO calendar found on iCloud account');
-    console.log(`[reminders] selected: "${cachedCalendar.displayName ?? '(no name)'}" | ${cachedCalendar.url}`);
+    console.log(`[reminders] using list: "${cachedCalendar.displayName ?? '(no name)'}"`);
   }
 
   return { calendar: cachedCalendar!, headers };
@@ -59,15 +52,6 @@ export async function createReminder(params: {
   dueDate?: Date;
   notes?: string;
 }): Promise<void> {
-  console.log('[caldav debug] env check:', {
-    username: process.env.ICLOUD_USERNAME,
-    passwordLength: process.env.ICLOUD_APP_PASSWORD?.length ?? 0,
-    allEnvKeys: Object.keys(process.env).filter(k =>
-      k.includes('ICLOUD') || k.includes('APPLE')
-    ),
-  });
-  console.log('[reminders] attempting with user:', process.env.ICLOUD_USERNAME?.slice(0, 5));
-
   const { calendar, headers } = await getTaskCalendar();
   const uid = randomUUID();
   const now = toIcalDate(new Date());

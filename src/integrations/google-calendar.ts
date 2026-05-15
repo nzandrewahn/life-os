@@ -34,19 +34,12 @@ function formatAuckland(iso: string): string {
 
 function getAuth(writeAccess = false) {
   const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  console.log('[calendar] GOOGLE_SERVICE_ACCOUNT_JSON defined:', !!json);
-  console.log('[calendar] raw value length:', json?.length ?? 0);
-
   if (!json) throw new Error('[google-calendar] GOOGLE_SERVICE_ACCOUNT_JSON is not set');
 
   let credentials: Record<string, unknown>;
   try {
     credentials = JSON.parse(json);
-    console.log('[calendar] credentials type:', credentials.type);
-    console.log('[calendar] client_email:', credentials.client_email);
-  } catch (e) {
-    console.log('[calendar] JSON parse error:', e instanceof Error ? e.message : e);
-    console.log('[calendar] first 100 chars of raw value:', json.slice(0, 100));
+  } catch {
     throw new Error('[google-calendar] GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON — check for unescaped newlines or quotes');
   }
 
@@ -54,20 +47,11 @@ function getAuth(writeAccess = false) {
     ? ['https://www.googleapis.com/auth/calendar']
     : ['https://www.googleapis.com/auth/calendar.readonly'];
 
-  try {
-    const auth = new google.auth.GoogleAuth({ credentials, scopes });
-    console.log('[calendar] GoogleAuth created successfully');
-    return auth;
-  } catch (e) {
-    console.log('[calendar] GoogleAuth setup error:', e instanceof Error ? e.message : e);
-    if (e instanceof Error) console.log('[calendar] stack:', e.stack);
-    throw e;
-  }
+  return new google.auth.GoogleAuth({ credentials, scopes });
 }
 
 function getCalendarId(): string {
   const id = process.env.GOOGLE_CALENDAR_ID;
-  console.log('[calendar] GOOGLE_CALENDAR_ID:', id ?? '(not set)');
   if (!id) throw new Error('[google-calendar] GOOGLE_CALENDAR_ID is not set');
   return id;
 }
@@ -174,28 +158,21 @@ export async function deleteCalendarEvent(eventId: string): Promise<void> {
 
   const cal = google.calendar({ version: 'v3', auth: getAuth(true) });
 
-  const res = await cal.events.delete({
+  await cal.events.delete({
     calendarId,
     eventId,
     sendUpdates: 'none',
   });
-  console.log('[calendar] delete response status:', res.status);
-  console.log('[calendar] delete response headers:', JSON.stringify(res.headers));
 
-  // Verify the deletion — a successful delete returns 204 and the event should no longer be fetchable
+  // Verify deletion — 404/410 on re-fetch confirms it's gone
   try {
     const check = await cal.events.get({ calendarId, eventId });
-    // If we get here, the event still exists
     const status = check.data.status;
-    if (status === 'cancelled') {
-      console.log('[calendar] event marked cancelled (soft delete) — expected for some calendar types');
-    } else {
-      console.error('[calendar] event still exists after delete, status:', status);
+    if (status !== 'cancelled') {
       throw new Error(`[google-calendar] delete appeared to succeed but event ${eventId} still exists (status: ${status})`);
     }
   } catch (e) {
     if (e instanceof Error && e.message.includes('still exists')) throw e;
-    // 404/410 means the event is gone — expected success path
-    console.log('[calendar] post-delete fetch threw (event is gone):', e instanceof Error ? e.message : e);
+    // 404/410 = expected — event is gone
   }
 }

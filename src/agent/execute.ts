@@ -126,13 +126,16 @@ async function writeSupabaseCapture(input: ToolInput) {
 }
 
 async function writeSupabaseLifeTask(input: ToolInput) {
-  return {
-    success: true,
-    id: `mock-life-task-${Date.now()}`,
+  const { data, error } = await supabase.from('life_tasks').insert({
     title: input.title,
     category: input.category,
-    message: `Life task "${input.title}" created`,
-  };
+    time_estimate: input.time_estimate ?? null,
+    priority: input.priority ?? 'normal',
+    due_date: input.due_date ?? null,
+    status: 'pending',
+  }).select('id').single();
+  if (error) throw new Error(`life_tasks insert failed: ${error.message}`);
+  return { success: true, id: data.id, title: input.title, message: `life task "${input.title}" created` };
 }
 
 async function execReadObsidianIndex(input: ToolInput) {

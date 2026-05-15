@@ -3,11 +3,6 @@ import express from 'express';
 import { createBot } from './bot';
 import { startCrons } from './crons';
 
-console.log('[env] NODE_ENV:', process.env.NODE_ENV);
-console.log('[env] RAILWAY_URL:', process.env.RAILWAY_URL);
-console.log('[env] RAILWAY_PUBLIC_DOMAIN:', process.env.RAILWAY_PUBLIC_DOMAIN);
-console.log('[env] PORT:', process.env.PORT);
-
 const PORT = process.env.PORT;
 if (!PORT) throw new Error('PORT environment variable is not set');
 
