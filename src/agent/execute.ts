@@ -10,6 +10,7 @@ import {
   markSketchingDone,
   readTrainingToday,
   markTrainingDone,
+  type WriteNotionTaskResult,
 } from '../integrations/notion';
 import { queryIndex, insertIndex } from '../memory/obsidian-index';
 import { createReminder as iCloudCreateReminder } from '../integrations/reminders';
@@ -54,15 +55,21 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
 }
 
 async function execWriteNotionTask(input: ToolInput) {
-  const result = await writeNotionTask(
+  const result: WriteNotionTaskResult = await writeNotionTask(
     input.title as string,
-    input.project as string,
-    input.priority as string,
+    input.project as string | undefined,
+    input.priority as string | undefined,
     input.time_estimate as number | undefined,
     input.energy as string | undefined,
     input.why as string | undefined,
   );
-  return { success: true, id: result.id, message: `task "${input.title}" created in Notion` };
+  const project = result.project ?? 'untagged';
+  const time = result.timeEstimate ? `${result.timeEstimate}hr` : '?hr';
+  return {
+    success: true,
+    id: result.id,
+    message: `added — ${result.title}\n→ ${project} · ${result.priority} · ${time} · ${result.energy} energy\nanything to adjust?`,
+  };
 }
 
 async function execUpdateNotionTaskStatus(input: ToolInput) {

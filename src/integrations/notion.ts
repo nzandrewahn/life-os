@@ -1,6 +1,8 @@
 import { Client } from '@notionhq/client';
+import Anthropic from '@anthropic-ai/sdk';
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 console.log('[notion] client methods:', typeof notion.databases?.query);
 
@@ -85,29 +87,86 @@ export async function readNotionTasks(): Promise<NotionTask[]> {
   return (active as Record<string, unknown>[]).map(mapTask);
 }
 
+interface InferredFields {
+  priority: string;
+  timeEstimate: number;
+  energy: string;
+  project: string | null;
+}
+
+async function inferTaskFields(title: string): Promise<InferredFields> {
+  const response = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 200,
+    system: `You are helping infer Notion task properties for Andrew. His projects are Lost Marbles Studio (kinetic activations, spec project is Token + Altar, dry run phase), Abstracted Objects (paused product drop brand), Blender (3D skill building), Sketching (30-day programme).
+
+Given a task title, infer:
+- priority: Critical / High / Normal / Low
+- timeEstimate: number in hours (0.5, 1, 1.5, 2, 3, 4)
+- energy: Low / Medium / High
+- project: Lost Marbles / Abstracted Objects / Blender / Sketching / Personal / null if unclear
+
+Respond with JSON only. No explanation.`,
+    messages: [{ role: 'user', content: title }],
+  });
+
+  const block = response.content.find(b => b.type === 'text');
+  if (!block || block.type !== 'text') return { priority: 'Normal', timeEstimate: 1, energy: 'Medium', project: null };
+
+  try {
+    return JSON.parse(block.text) as InferredFields;
+  } catch {
+    return { priority: 'Normal', timeEstimate: 1, energy: 'Medium', project: null };
+  }
+}
+
+export interface WriteNotionTaskResult {
+  id: string;
+  title: string;
+  project: string | null;
+  priority: string;
+  timeEstimate: number;
+  energy: string;
+}
+
 export async function writeNotionTask(
   title: string,
-  project: string,
-  priority: string,
+  project?: string | null,
+  priority?: string,
   timeEstimate?: number,
   energy?: string,
   why?: string,
-): Promise<{ id: string }> {
+): Promise<WriteNotionTaskResult> {
+  const needsInference = !project || !priority || !energy || timeEstimate == null;
+  let inferred: InferredFields | null = null;
+
+  if (needsInference) {
+    console.log('[notion] inferring fields for task:', title);
+    inferred = await inferTaskFields(title);
+    console.log('[notion] inferred:', inferred);
+  }
+
+  const finalProject = project ?? inferred?.project ?? null;
+  const finalPriority = priority ?? inferred?.priority ?? 'Normal';
+  const finalEnergy = energy ?? inferred?.energy ?? 'Medium';
+  const finalTimeEstimate = timeEstimate ?? inferred?.timeEstimate ?? 1;
+
   const properties: Record<string, unknown> = {
     Name: { title: [{ text: { content: title } }] },
     Status: { select: { name: 'Not started' } },
-    Priority: { select: { name: priority } },
-    Project: { select: { name: project } },
+    Priority: { select: { name: finalPriority } },
+    'Time Estimate': { number: finalTimeEstimate },
+    Energy: { select: { name: finalEnergy } },
   };
-  if (timeEstimate != null) properties['Time Estimate'] = { number: timeEstimate };
-  if (energy) properties['Energy'] = { select: { name: energy } };
+  if (finalProject) properties['Project'] = { select: { name: finalProject } };
   if (why) properties['Why'] = { rich_text: [{ text: { content: why } }] };
 
   const page = await notion.pages.create({
     parent: { database_id: process.env.NOTION_TASKS_DB_ID! },
     properties: properties as never,
   });
-  return { id: page.id };
+
+  return { id: page.id, title, project: finalProject, priority: finalPriority, timeEstimate: finalTimeEstimate, energy: finalEnergy };
 }
 
 export async function updateNotionTaskStatus(pageId: string, status: string): Promise<void> {

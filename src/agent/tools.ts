@@ -37,7 +37,7 @@ export const TOOLS: Anthropic.Tool[] = [
         },
         why: { type: 'string', description: 'Why this task matters (optional).' },
       },
-      required: ['title', 'project', 'priority'],
+      required: ['title'],
     },
   },
   {
