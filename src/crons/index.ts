@@ -62,10 +62,9 @@ format exactly as shown below. all lowercase. no asterisks. no markdown symbols.
 
 good morning.
 
-— today —
-[list tasks returned by read_notion_tasks only, up to 5: Critical first, then High, then Normal, then Low. omit Done and Paused. omit sub-tasks — show parent tasks only, unless the parent is Paused then show first sub-task instead. if read_notion_tasks returned no tasks write "no tasks found"]
+— on deck —
+[list all active tasks returned by read_notion_tasks. omit Done and Paused. omit sub-tasks — show parent tasks only, unless the parent is Paused then show first sub-task instead. if read_notion_tasks returned no tasks write "no tasks found". no priority ordering — show as inventory.]
 [Xhr, energy] task name (project)
-why: one line
 
 — training —
 [session text from read_training_today, or omit this section entirely if the tool errored]
@@ -80,14 +79,13 @@ warm-up: straight lines then ellipses, 5 min
 — life —
 [pending life tasks if any — omit this section entirely if none]
 
-what's your energy (1–10) and hours available?
+what's your energy (1–10) and hours free today?
 
 field rules:
 - time estimate: show as [Xhr] — use [?hr] if missing
 - energy: second value in brackets [Xhr, energy] — omit if missing
 - project in parentheses after task name
-- why: one line max, omit the line if why field is empty
-- max 5 tasks total in today section`,
+- no why field`,
     [],
   );
 }

@@ -4,6 +4,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { runAgentLoop } from './agent/loop';
 import { generateMorningBrief } from './crons';
+import { runDayPlan } from './agent/dayplan';
 import { logMessage, getRecentHistory } from './db';
 import { transcribeVoice } from './integrations/groq';
 import { formatForTelegram, escapeHtml } from './utils/formatter';
@@ -37,6 +38,19 @@ interface PendingCapture {
   originalMessage: string;
 }
 const pending = new Map<string, PendingCapture>();
+const lastMessageWasBrief = new Map<string, boolean>();
+
+function isEnergyReply(text: string): { energy: number; hours: number } | null {
+  const energyMatch = text.match(/\b([1-9]|10)\b/);
+  const hoursMatch = text.match(/(\d+\.?\d*)\s*(?:hr|hrs|hour|hours)/i);
+  if (energyMatch && hoursMatch) {
+    return {
+      energy: parseInt(energyMatch[1], 10),
+      hours: parseFloat(hoursMatch[1]),
+    };
+  }
+  return null;
+}
 
 export function createBot(): Telegraf {
   const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
@@ -107,9 +121,20 @@ async function handleIncoming(
         pendingCapture.classification,
         history
       );
+    } else if (lastMessageWasBrief.get(chatId)) {
+      const parsed = isEnergyReply(userMessage);
+      if (parsed) {
+        console.log(`[${ts()}] routing to day plan — energy: ${parsed.energy}, hours: ${parsed.hours}`);
+        lastMessageWasBrief.set(chatId, false);
+        agentReply = await runDayPlan(parsed.energy, parsed.hours);
+      } else {
+        lastMessageWasBrief.set(chatId, false);
+        agentReply = await runAgentLoop(userMessage, history);
+      }
     } else if (isMorningBrief(userMessage)) {
       console.log(`[${ts()}] routing to morning brief`);
       agentReply = await generateMorningBrief();
+      lastMessageWasBrief.set(chatId, true);
     } else if (isCaptureIntent(userMessage)) {
       // Only route to capture if message contains explicit trigger keywords
       console.log(`[${ts()}] routing to capture pipeline`);

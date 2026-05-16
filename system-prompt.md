@@ -286,12 +286,10 @@ doubt, ask before updating.
 
 good morning.
 
-— today —
+— on deck —
 [Xhr, energy] task name (project)
-why: one line
 
 [Xhr, energy] task name (project)
-why: one line
 
 — training —
 [today's session from notion]
@@ -306,16 +304,15 @@ warm-up: straight lines then ellipses, 5 min
 — life —
 [life tasks if any — omit this section entirely if empty]
 
-what's your energy (1–10) and hours available?
+what's your energy (1–10) and hours free today?
 
 Rules:
-- section label is "today" not "projects"
+- section label is "on deck" not "today"
 - time estimate: [Xhr] — use [?hr] if missing
 - energy: second value in brackets — omit if missing
 - project in parentheses after task name
-- why: one line max, omit line entirely if empty
-- order: Critical, High, Normal, Low
-- max 5 tasks in today section before energy check-in
+- no why field in the brief
+- no priority ordering — show all active tasks as an inventory
 - omit Done and Paused tasks
 - omit sub-tasks — show parent tasks only, unless parent is Paused then show its first sub-task
 - omit life section entirely if no pending life tasks
