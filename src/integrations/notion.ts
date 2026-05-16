@@ -61,10 +61,17 @@ function mapTask(page: Record<string, unknown>): NotionTask {
 }
 
 export async function readNotionTasks(): Promise<NotionTask[]> {
-  console.log('[notion] querying tasks db:', process.env.NOTION_TASKS_DB_ID);
+  const rawId = process.env.NOTION_TASKS_DB_ID || '275237a5f577800e8254f56b93e97a31';
 
-  const response = await notion.dataSources.query({
-    data_source_id: TASKS_DB_ID,
+  // Format as UUID with dashes if not already
+  const dbId = rawId.includes('-') ? rawId
+    : `${rawId.slice(0, 8)}-${rawId.slice(8, 12)}-${rawId.slice(12, 16)}-${rawId.slice(16, 20)}-${rawId.slice(20)}`;
+
+  console.log('[notion] formatted db ID:', dbId);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const response = await (notion as any).databases.query({
+    database_id: dbId,
     filter: {
       property: 'Status',
       select: { does_not_equal: 'Done' },
