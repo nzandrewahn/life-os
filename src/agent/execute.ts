@@ -73,6 +73,13 @@ async function execWriteNotionTask(input: ToolInput) {
 }
 
 async function execUpdateNotionTask(input: ToolInput) {
+  console.log('[update] raw input:', JSON.stringify(input));
+  console.log('[update] page_id:', input.page_id);
+  console.log('[update] status:', input.status);
+  console.log('[update] priority:', input.priority);
+  console.log('[update] energy:', input.energy);
+  console.log('[update] time_estimate:', input.time_estimate);
+  console.log('[update] project:', input.project);
   await updateNotionTask(input.page_id as string, {
     status:       input.status        as string | undefined,
     priority:     input.priority      as string | undefined,

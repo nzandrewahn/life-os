@@ -179,6 +179,12 @@ export async function updateNotionTask(
     project?: string;
   },
 ): Promise<void> {
+  console.log('[notion] updateNotionTask pageId:', pageId);
+  console.log('[notion] priority provided:', fields.priority);
+  console.log('[notion] energy provided:', fields.energy);
+  console.log('[notion] timeEstimate provided:', fields.timeEstimate);
+  console.log('[notion] project provided:', fields.project);
+
   const properties: Record<string, unknown> = {};
   if (fields.status)       properties['Status']        = { status: { name: fields.status } };
   if (fields.priority)     properties['Priority']      = { select: { name: fields.priority } };
@@ -186,7 +192,10 @@ export async function updateNotionTask(
   if (fields.project)      properties['Project']       = { select: { name: fields.project } };
   if (fields.timeEstimate != null) properties['Time Estimate'] = { number: fields.timeEstimate };
 
-  await notion.pages.update({ page_id: pageId, properties: properties as never });
+  console.log('[notion] updateNotionTask props:', JSON.stringify(properties, null, 2));
+
+  const response = await notion.pages.update({ page_id: pageId, properties: properties as never });
+  console.log('[notion] update response:', JSON.stringify(response, null, 2));
 }
 
 // ─── Sketching ────────────────────────────────────────────────────────────────

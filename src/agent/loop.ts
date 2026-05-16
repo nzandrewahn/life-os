@@ -30,6 +30,7 @@ export function initAgentTools(): void {
   console.log('[agent] NOTION_TRAINING_PAGE_ID:', process.env.NOTION_TRAINING_PAGE_ID ?? '(not set)');
   console.log('[agent] NOTION_SKETCHING_DB_ID:', process.env.NOTION_SKETCHING_DB_ID ?? '(not set)');
   console.log(`[agent] ${allTools.length} tools registered`);
+  console.log('[agent] update tool fields:', JSON.stringify(allTools.find(t => t.name === 'update_notion_task_status')));
 }
 
 function loadSystemPrompt(): string {
