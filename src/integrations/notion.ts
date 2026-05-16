@@ -2,7 +2,7 @@ import { Client } from '@notionhq/client';
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
-const TASKS_DB_ID = process.env.NOTION_TASKS_DB_ID ?? '275237a5-f577-80fa-b074-000b071090b7';
+const TASKS_DB_ID = process.env.NOTION_TASKS_DB_ID ?? '275237a5f577800e8254f56b93e97a31';
 const SKETCHING_DB_ID = process.env.NOTION_SKETCHING_DB_ID ?? '4cda0f06-fd18-488c-a65e-496e0a463ff7';
 const TRAINING_PAGE_ID = process.env.NOTION_TRAINING_PAGE_ID ?? '';
 
@@ -61,6 +61,8 @@ function mapTask(page: Record<string, unknown>): NotionTask {
 }
 
 export async function readNotionTasks(): Promise<NotionTask[]> {
+  console.log('[notion] querying tasks db:', process.env.NOTION_TASKS_DB_ID);
+
   const response = await notion.dataSources.query({
     data_source_id: TASKS_DB_ID,
     filter: {
@@ -71,6 +73,10 @@ export async function readNotionTasks(): Promise<NotionTask[]> {
       { property: 'Priority', direction: 'ascending' },
     ],
   });
+
+  console.log('[notion] tasks found:', (response.results as Record<string, unknown>[]).map(
+    p => ((p.properties as Record<string, Record<string, unknown>>)['Name']?.title as Array<{ plain_text: string }>)?.[0]?.plain_text
+  ));
 
   return (response.results as Record<string, unknown>[]).map(mapTask);
 }
@@ -165,132 +171,48 @@ export async function markSketchingDone(pageId: string): Promise<void> {
 
 // ─── Training ─────────────────────────────────────────────────────────────────
 
-type NotionBlock = {
-  id: string;
-  type: string;
-  has_children?: boolean;
-  [key: string]: unknown;
-};
+type ToDo = { text: string; checked: boolean };
 
-async function fetchBlockChildren(blockId: string): Promise<NotionBlock[]> {
-  const blocks: NotionBlock[] = [];
-  let cursor: string | undefined;
-  do {
-    const resp = await notion.blocks.children.list({
-      block_id: blockId,
-      page_size: 100,
-      ...(cursor ? { start_cursor: cursor } : {}),
-    });
-    blocks.push(...(resp.results as NotionBlock[]));
-    cursor = resp.has_more && resp.next_cursor ? resp.next_cursor : undefined;
-  } while (cursor);
-  return blocks;
-}
+export async function readTrainingToday(): Promise<string> {
+  const topLevel = await notion.blocks.children.list({
+    block_id: process.env.NOTION_TRAINING_PAGE_ID!,
+  });
 
-function richText(block: NotionBlock): string {
-  const data = block[block.type] as { rich_text?: Array<{ plain_text: string }> } | undefined;
-  return data?.rich_text?.map(t => t.plain_text).join('') ?? '';
-}
+  const toDos: ToDo[] = [];
 
-interface TrainingEntry {
-  weekNum: number;
-  day: string;
-  session: string;
-  checked: boolean;
-  blockId: string;
-}
-
-async function collectTrainingEntries(pageId: string): Promise<TrainingEntry[]> {
-  const entries: TrainingEntry[] = [];
-  let currentWeek = 0;
-
-  const topBlocks = await fetchBlockChildren(pageId);
-
-  for (const block of topBlocks) {
-    if (['heading_1', 'heading_2', 'heading_3'].includes(block.type)) {
-      const text = richText(block);
-      const m = text.match(/Week\s+(\d+)/i);
-      if (m) currentWeek = parseInt(m[1], 10);
-    }
-
-    if (block.type === 'column_list') {
-      const columns = await fetchBlockChildren(block.id);
-      for (const col of columns) {
-        if (col.type !== 'column') continue;
-        const colBlocks = await fetchBlockChildren(col.id);
-        for (const cb of colBlocks) {
-          if (cb.type !== 'to_do') continue;
-          const todo = cb.to_do as { checked: boolean; rich_text: Array<{ plain_text: string }> };
-          const text = todo.rich_text.map(t => t.plain_text).join('');
-          // expect "Monday: 5km easy" or "Monday: rest"
-          const m = text.match(/^(\w+):\s*(.+)$/i);
-          if (!m) continue;
-          entries.push({
-            weekNum: currentWeek,
-            day: m[1],
-            session: m[2].trim(),
-            checked: todo.checked,
-            blockId: cb.id,
-          });
-        }
+  for (const block of topLevel.results as Array<Record<string, unknown>>) {
+    if (block.type !== 'column_list') continue;
+    const columns = await notion.blocks.children.list({ block_id: block.id as string });
+    for (const col of columns.results as Array<Record<string, unknown>>) {
+      if (col.type !== 'column') continue;
+      const items = await notion.blocks.children.list({ block_id: col.id as string });
+      for (const item of items.results as Array<Record<string, unknown>>) {
+        if (item.type !== 'to_do') continue;
+        const todo = item.to_do as { checked: boolean; rich_text: Array<{ plain_text: string }> };
+        const text = todo.rich_text.map(t => t.plain_text).join('');
+        toDos.push({ text, checked: todo.checked });
       }
     }
   }
 
-  return entries;
-}
-
-export interface TrainingResult {
-  rest_day: boolean;
-  already_done?: boolean;
-  week?: number;
-  day?: string;
-  session?: string;
-  to_do_block_id?: string;
-  error?: string;
-}
-
-export async function readTrainingToday(): Promise<TrainingResult> {
-  const pageId = TRAINING_PAGE_ID;
-  if (!pageId) throw new Error('NOTION_TRAINING_PAGE_ID is not set');
+  console.log('[training] total to_do blocks found:', toDos.length);
+  console.log('[training] checked:', toDos.filter(t => t.checked).length);
 
   const today = new Date().toLocaleDateString('en-NZ', {
     weekday: 'long',
     timeZone: 'Pacific/Auckland',
   });
 
-  if (today === 'Friday' || today === 'Sunday') {
-    return { rest_day: true, day: today, session: 'rest day' };
-  }
+  if (today === 'Friday' || today === 'Sunday') return 'rest day';
 
-  const entries = await collectTrainingEntries(pageId);
-  console.log(`[notion] readTrainingToday: ${entries.length} to_do blocks found`);
+  const lastChecked = [...toDos].reverse().find(t => t.checked);
+  const currentWeekIndex = lastChecked ? Math.floor(toDos.indexOf(lastChecked) / 7) : 0;
 
-  // Current week = week of the last checked session (default week 1)
-  let currentWeekNum = 1;
-  for (const e of entries) {
-    if (e.checked) currentWeekNum = e.weekNum;
-  }
+  const weekStart = currentWeekIndex * 7;
+  const weekTodos = toDos.slice(weekStart, weekStart + 7);
+  const todaySession = weekTodos.find(t => t.text.toLowerCase().includes(today.toLowerCase()));
 
-  const weekEntries = entries.filter(e => e.weekNum === currentWeekNum);
-  if (!weekEntries.length) {
-    return { rest_day: false, error: `no entries found for week ${currentWeekNum}` };
-  }
-
-  const todayEntry = weekEntries.find(e => e.day.toLowerCase() === today.toLowerCase());
-
-  if (!todayEntry || /^rest$/i.test(todayEntry.session)) {
-    return { rest_day: true, day: today, week: currentWeekNum, session: 'rest day' };
-  }
-
-  return {
-    rest_day: todayEntry.checked,
-    already_done: todayEntry.checked,
-    week: currentWeekNum,
-    day: today,
-    session: todayEntry.session,
-    to_do_block_id: todayEntry.blockId,
-  };
+  return todaySession?.text.replace(/^\*\*[A-Za-z]+:\*\*\s*/, '') ?? 'rest day';
 }
 
 export async function markTrainingDone(blockId: string): Promise<void> {
