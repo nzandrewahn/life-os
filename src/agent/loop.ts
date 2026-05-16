@@ -20,9 +20,7 @@ const NOTION_CONTEXT = `
 - mark_training_done: marks today's training as complete (pass to_do_block_id)
 - mark_sketching_done: marks current sketching session complete (pass page_id)
 
-all tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, Personal — go to the Andrew Task Board only. never invent tasks from context.
-
-CRITICAL: you MUST call update_notion_task_status as a tool call for any update operation. never acknowledge or confirm an update without first making the tool call and receiving a response. if the user asks to update multiple tasks, call the tool once per task — do not batch or simulate. an update that has not been tool-called has not happened.`;
+all tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, Personal — go to the Andrew Task Board only. never invent tasks from context.`;
 
 const allTools: Anthropic.Tool[] = [...TOOLS];
 
