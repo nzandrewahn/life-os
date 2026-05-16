@@ -13,6 +13,17 @@ function headers() {
   };
 }
 
+function sanitizeFilename(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim()
+    .slice(0, 80);
+}
+
 // Encode each path segment individually, preserve slashes
 function encodePath(path: string): string {
   return path.split('/').map(encodeURIComponent).join('/');
@@ -44,8 +55,14 @@ export async function readNote(path: string): Promise<string> {
 }
 
 export async function writeNote(path: string, content: string): Promise<void> {
-  const name = path.split('/').pop() ?? path;
-  await githubPut(path, content, `add: ${name}`);
+  const segments = path.split('/');
+  const raw = segments.pop() ?? path;
+  const ext = raw.endsWith('.md') ? '.md' : '';
+  const base = ext ? raw.slice(0, -ext.length) : raw;
+  const sanitized = sanitizeFilename(base) + ext;
+  const filePath = [...segments, sanitized].join('/');
+  console.log('[obsidian] writing to path:', filePath);
+  await githubPut(filePath, content, `add: ${sanitized}`);
 }
 
 export async function appendToNote(path: string, addition: string): Promise<void> {
