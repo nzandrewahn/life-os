@@ -2,6 +2,62 @@ import type Anthropic from '@anthropic-ai/sdk';
 
 export const TOOLS: Anthropic.Tool[] = [
   {
+    name: 'read_notion_tasks',
+    description:
+      'Read all open tasks from the Andrew Task Board in Notion. Filters out Done tasks. Returns task name, status, priority, energy, project, time estimate, why, and date. Use during morning briefs and whenever Andrew asks about his task list.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'write_notion_task',
+    description:
+      'Create a new task in the Andrew Task Board in Notion. Use for ALL project tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, and any other project work. Do NOT use write_supabase_life_task for project tasks.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Task title.' },
+        project: {
+          type: 'string',
+          enum: ['Lost Marbles', 'Abstracted Objects', 'Blender', 'Sketching', 'Personal', 'Other'],
+          description: 'Project this task belongs to.',
+        },
+        priority: {
+          type: 'string',
+          enum: ['Critical', 'High', 'Normal', 'Low'],
+          description: 'Task priority.',
+        },
+        time_estimate: { type: 'number', description: 'Estimated hours (optional).' },
+        energy: {
+          type: 'string',
+          enum: ['Low', 'Medium', 'High'],
+          description: 'Energy level required (optional).',
+        },
+        why: { type: 'string', description: 'Why this task matters (optional).' },
+      },
+      required: ['title', 'project', 'priority'],
+    },
+  },
+  {
+    name: 'update_notion_task_status',
+    description:
+      'Update the status of a task in the Andrew Task Board. Use when Andrew says he completed, paused, or started a task. Get the page_id from read_notion_tasks.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        page_id: { type: 'string', description: 'Notion page ID of the task.' },
+        status: {
+          type: 'string',
+          enum: ['Not started', 'In progress', 'Paused', 'Done'],
+          description: 'New status value.',
+        },
+      },
+      required: ['page_id', 'status'],
+    },
+  },
+  {
     name: 'read_training_today',
     description:
       'Read today\'s scheduled training session from the 16-week half marathon plan. Fetches the Notion training page, finds the last completed checkbox to determine the current week, then returns the session for today\'s day of the week. Returns rest_day: true on Fridays or if the plan has no session scheduled. Also returns the exact page ID and checkbox line needed to mark it done — when Andrew says he completed training, call notion-update-page with command "update_content" to replace the `[ ]` with `[x]` in the full_checkbox_line. Include in morning brief under — training —.',
