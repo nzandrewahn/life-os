@@ -9,18 +9,28 @@ import type { DbMessage } from '../types';
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MAX_ITERATIONS = 10;
 
-// Andrew Task Board data source — injected into system prompt so Claude knows where to read/write tasks
-const NOTION_CONTEXT = `\n\n## notion task board\n\nALL tasks — including for Lost Marbles, Abstracted Objects, Blender, and Sketching projects — go to the Andrew Task Board ONLY. Never search for or create tasks in any other Notion database.\n\ndata source id: 275237a5-f577-80fa-b074-000b071090b7\nto read tasks: notion-fetch with id "collection://275237a5-f577-80fa-b074-000b071090b7". to create tasks: notion-create-pages with parent { type: "data_source_id", data_source_id: "275237a5-f577-80fa-b074-000b071090b7" }. to update task status: notion-update-page with command "update_properties".\nproperties: Name (title), Status (Not started/In progress/Paused/Done), Priority (Critical/High/Normal/Low), Energy (Low/Medium/High), Project (Lost Marbles/Abstracted Objects/Blender/Sketching/Personal/Other), Time Estimate (number hours), Why (text), Date (date YYYY-MM-DD).\nwhen a project is mentioned (e.g. "Lost Marbles", "Blender") — set the Project field to that value on the task, do not route to any other database.\nwhen reading tasks: filter out Status=Done and parent tasks that have sub-items. sort by priority (Critical first) then energy (High last).`;
+// Andrew Task Board data source — use env var with fallback to known ID
+const TASKS_DB_ID = process.env.NOTION_TASKS_DB_ID ?? '275237a5-f577-80fa-b074-000b071090b7';
+
+const NOTION_CONTEXT = `\n\n## notion task board\n\nALL tasks — including for Lost Marbles, Abstracted Objects, Blender, and Sketching projects — go to the Andrew Task Board ONLY. Never search for or create tasks in any other Notion database.\n\ndata source id: ${TASKS_DB_ID}\nto read tasks: notion-fetch with id "collection://${TASKS_DB_ID}". to create tasks: notion-create-pages with parent { type: "data_source_id", data_source_id: "${TASKS_DB_ID}" }. to update task status: notion-update-page with command "update_properties".\nproperties: Name (title), Status (Not started/In progress/Paused/Done), Priority (Critical/High/Normal/Low), Energy (Low/Medium/High), Project (Lost Marbles/Abstracted Objects/Blender/Sketching/Personal/Other), Time Estimate (number hours), Why (text), Date (date YYYY-MM-DD).\nwhen a project is mentioned (e.g. "Lost Marbles", "Blender") — set the Project field to that value on the task, do not route to any other database.\nwhen reading tasks: filter out Status=Done and parent tasks that have sub-items. sort by priority (Critical first) then energy (High last).`;
 
 let allTools: Anthropic.Tool[] = [...TOOLS];
 
 export async function initAgentTools(): Promise<void> {
-  try {
-    const notionTools = await loadNotionTools();
-    allTools = [...TOOLS, ...notionTools];
-  } catch (err) {
-    console.error('[agent] failed to load Notion MCP tools:', err instanceof Error ? err.message : err);
+  console.log('[agent] initialising Notion MCP tools...');
+  console.log('[agent] NOTION_API_KEY set:', !!process.env.NOTION_API_KEY);
+  console.log('[agent] NOTION_TASKS_DB_ID:', process.env.NOTION_TASKS_DB_ID ?? '(using default)');
+  console.log('[agent] NOTION_TRAINING_PAGE_ID:', process.env.NOTION_TRAINING_PAGE_ID ?? '(not set)');
+  console.log('[agent] NOTION_SKETCHING_DB_ID:', process.env.NOTION_SKETCHING_DB_ID ?? '(not set)');
+
+  const notionTools = await loadNotionTools();
+  if (notionTools.length === 0) {
+    console.error('[agent] WARNING: 0 Notion tools loaded — task read/write will not work');
+  } else {
+    console.log(`[agent] ${notionTools.length} Notion MCP tools loaded`);
   }
+  allTools = [...TOOLS, ...notionTools];
+  console.log(`[agent] total tools registered: ${allTools.length}`);
 }
 
 function loadSystemPrompt(): string {

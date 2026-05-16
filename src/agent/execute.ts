@@ -265,8 +265,13 @@ function extractPageProperties(content: string): Record<string, unknown> | null 
 }
 
 async function execReadTrainingToday() {
+  console.log('[tool] read_training_today called');
   const pageId = process.env.NOTION_TRAINING_PAGE_ID;
-  if (!pageId) throw new Error('NOTION_TRAINING_PAGE_ID is not set');
+  if (!pageId) {
+    console.error('[tool] read_training_today: NOTION_TRAINING_PAGE_ID is not set');
+    throw new Error('NOTION_TRAINING_PAGE_ID is not set');
+  }
+  console.log('[tool] read_training_today: fetching page', pageId);
 
   const raw = await callNotionTool('notion-fetch', { id: pageId });
   const weeks = parseTrainingWeeks(raw);
@@ -312,8 +317,13 @@ async function execReadTrainingToday() {
 }
 
 async function execReadSketchingToday() {
+  console.log('[tool] read_sketching_today called');
   const dbId = process.env.NOTION_SKETCHING_DB_ID;
-  if (!dbId) throw new Error('NOTION_SKETCHING_DB_ID is not set');
+  if (!dbId) {
+    console.error('[tool] read_sketching_today: NOTION_SKETCHING_DB_ID is not set');
+    throw new Error('NOTION_SKETCHING_DB_ID is not set');
+  }
+  console.log('[tool] read_sketching_today: querying database', dbId);
 
   const WARMUP = 'warm-up: rows of straight lines (horizontal, vertical, 45°, diagonal) then ellipses at different angles. 5 min.';
   const dataSourceUrl = `collection://${dbId}`;
