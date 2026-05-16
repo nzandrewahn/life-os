@@ -62,7 +62,20 @@ export async function writeNote(path: string, content: string): Promise<void> {
   const sanitized = sanitizeFilename(base) + ext;
   const filePath = [...segments, sanitized].join('/');
   console.log('[obsidian] writing to path:', filePath);
-  await githubPut(filePath, content, `add: ${sanitized}`);
+
+  try {
+    await githubPut(filePath, content, `add: ${sanitized}`);
+  } catch (err) {
+    const status = (err as AxiosError).response?.status;
+    if (status === 422) {
+      const newFilename = sanitizeFilename(base) + `-${Date.now()}` + ext;
+      const newPath = [...segments, newFilename].join('/');
+      console.log('[obsidian] file exists, retrying as:', newPath);
+      await githubPut(newPath, content, `add: ${newFilename}`);
+    } else {
+      throw err;
+    }
+  }
 }
 
 export async function appendToNote(path: string, addition: string): Promise<void> {
