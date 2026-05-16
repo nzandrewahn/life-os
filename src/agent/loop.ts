@@ -20,7 +20,9 @@ const NOTION_CONTEXT = `
 - mark_training_done: marks today's training as complete (pass to_do_block_id)
 - mark_sketching_done: marks current sketching session complete (pass page_id)
 
-all tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, Personal — go to the Andrew Task Board only. never invent tasks from context.`;
+all tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, Personal — go to the Andrew Task Board only. never invent tasks from context.
+
+CRITICAL: you MUST call update_notion_task_status as a tool call for any update operation. never acknowledge or confirm an update without first making the tool call and receiving a response. if the user asks to update multiple tasks, call the tool once per task — do not batch or simulate. an update that has not been tool-called has not happened.`;
 
 const allTools: Anthropic.Tool[] = [...TOOLS];
 
@@ -77,6 +79,10 @@ export async function runAgentLoop(
     if (response.stop_reason === 'end_turn') {
       const text = response.content.find(b => b.type === 'text');
       if (!text || text.type !== 'text') throw new Error('No text in final response');
+      const toolCalledThisIteration = response.content.some(b => b.type === 'tool_use');
+      if (!toolCalledThisIteration && /updated|done|marked|changed|set /i.test(text.text)) {
+        console.warn('[agent] WARNING: response claims update but no tool was called');
+      }
       return text.text;
     }
 
