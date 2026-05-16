@@ -50,22 +50,21 @@ async function runMorningBrief(telegram: Telegram): Promise<void> {
   const brief = await runAgentLoop(
     `generate morning brief for ${today}.
 
-steps:
-1. call read_notion_tasks — get all open tasks
+CRITICAL: Before generating the morning brief, you MUST call read_notion_tasks to get the actual current tasks. Never generate or assume tasks from context. If read_notion_tasks returns empty, say "no tasks found" in the today section. Never hallucinate tasks.
+
+steps — call ALL of these tools before writing anything:
+1. call read_notion_tasks — REQUIRED. use the returned tasks only. do not invent tasks.
 2. call read_training_today — get today's session
 3. call read_sketching_today — get today's sketching session
 4. call read_google_calendar with days=1 — get today's events
-5. call read_supabase_history with days=1 — get any pending life tasks mentioned recently
+5. call read_supabase_history with days=1 — check for pending life tasks
 
 format exactly as shown below. all lowercase. no asterisks. no markdown symbols. no commentary.
 
 good morning.
 
 — today —
-[for each task, up to 5: Critical first, then High, then Normal, then Low. omit Done and Paused. omit sub-tasks — show parent tasks only, unless the parent is Paused then show first sub-task instead]
-[Xhr, energy] task name (project)
-why: one line
-
+[list tasks returned by read_notion_tasks only, up to 5: Critical first, then High, then Normal, then Low. omit Done and Paused. omit sub-tasks — show parent tasks only, unless the parent is Paused then show first sub-task instead. if read_notion_tasks returned no tasks write "no tasks found"]
 [Xhr, energy] task name (project)
 why: one line
 
@@ -86,8 +85,8 @@ what's your energy (1–10) and hours available?
 
 field rules:
 - time estimate: show as [Xhr] — use [?hr] if missing
-- energy: show as second value in brackets [Xhr, energy] — omit energy bracket value if missing
-- project: in parentheses after task name
+- energy: second value in brackets [Xhr, energy] — omit if missing
+- project in parentheses after task name
 - why: one line max, omit the line if why field is empty
 - max 5 tasks total in today section`,
     [],

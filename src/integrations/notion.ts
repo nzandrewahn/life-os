@@ -171,48 +171,68 @@ export async function markSketchingDone(pageId: string): Promise<void> {
 
 // ─── Training ─────────────────────────────────────────────────────────────────
 
-type ToDo = { text: string; checked: boolean };
-
 export async function readTrainingToday(): Promise<string> {
+  const today = new Intl.DateTimeFormat('en-NZ', {
+    weekday: 'long',
+    timeZone: 'Pacific/Auckland',
+  }).format(new Date());
+
+  console.log('[training] today is:', today);
+
+  if (today === 'Friday' || today === 'Sunday') return 'rest day';
+
   const topLevel = await notion.blocks.children.list({
     block_id: process.env.NOTION_TRAINING_PAGE_ID!,
   });
 
-  const toDos: ToDo[] = [];
+  console.log('[training] top level blocks:', topLevel.results.length);
 
-  for (const block of topLevel.results as Array<Record<string, unknown>>) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const toDos: { text: string; checked: boolean }[] = [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const block of topLevel.results as any[]) {
     if (block.type !== 'column_list') continue;
-    const columns = await notion.blocks.children.list({ block_id: block.id as string });
-    for (const col of columns.results as Array<Record<string, unknown>>) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cols = await notion.blocks.children.list({ block_id: block.id });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const col of cols.results as any[]) {
       if (col.type !== 'column') continue;
-      const items = await notion.blocks.children.list({ block_id: col.id as string });
-      for (const item of items.results as Array<Record<string, unknown>>) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const items = await notion.blocks.children.list({ block_id: col.id });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const item of items.results as any[]) {
         if (item.type !== 'to_do') continue;
-        const todo = item.to_do as { checked: boolean; rich_text: Array<{ plain_text: string }> };
-        const text = todo.rich_text.map(t => t.plain_text).join('');
-        toDos.push({ text, checked: todo.checked });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const text = (item.to_do.rich_text as any[]).map((t: any) => t.plain_text).join('');
+        toDos.push({ text, checked: item.to_do.checked });
       }
     }
   }
 
-  console.log('[training] total to_do blocks found:', toDos.length);
-  console.log('[training] checked:', toDos.filter(t => t.checked).length);
+  console.log('[training] to_do blocks found:', toDos.length);
+  console.log('[training] checked count:', toDos.filter(t => t.checked).length);
 
-  const today = new Date().toLocaleDateString('en-NZ', {
-    weekday: 'long',
-    timeZone: 'Pacific/Auckland',
-  });
+  if (toDos.length === 0) return 'no sessions found — check notion connection';
 
-  if (today === 'Friday' || today === 'Sunday') return 'rest day';
+  const lastCheckedIndex = toDos.map(t => t.checked).lastIndexOf(true);
+  const weekIndex = lastCheckedIndex === -1 ? 0 : Math.floor(lastCheckedIndex / 7);
 
-  const lastChecked = [...toDos].reverse().find(t => t.checked);
-  const currentWeekIndex = lastChecked ? Math.floor(toDos.indexOf(lastChecked) / 7) : 0;
+  console.log('[training] current week index:', weekIndex);
 
-  const weekStart = currentWeekIndex * 7;
+  const weekStart = weekIndex * 7;
   const weekTodos = toDos.slice(weekStart, weekStart + 7);
+
+  console.log('[training] week todos:', weekTodos.map(t => t.text.substring(0, 50)));
+
   const todaySession = weekTodos.find(t => t.text.toLowerCase().includes(today.toLowerCase()));
 
-  return todaySession?.text.replace(/^\*\*[A-Za-z]+:\*\*\s*/, '') ?? 'rest day';
+  if (!todaySession) return 'rest day';
+
+  return todaySession.text
+    .replace(/\*\*/g, '')
+    .replace(new RegExp(`^${today}:\\s*`, 'i'), '')
+    .trim();
 }
 
 export async function markTrainingDone(blockId: string): Promise<void> {
