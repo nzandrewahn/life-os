@@ -3,7 +3,6 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { TOOLS } from './tools';
 import { executeTool } from './execute';
-import { readNotionTasks } from '../integrations/notion';
 import type { DbMessage } from '../types';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -50,25 +49,11 @@ function loadSystemPrompt(): string {
   return `${base}${NOTION_CONTEXT}`;
 }
 
-const UPDATE_KEYWORDS = ['update', 'set', 'mark', 'change', 'done', 'complete', 'finished', 'priority', 'energy'];
-
 export async function runAgentLoop(
   userMessage: string,
   history: DbMessage[]
 ): Promise<string> {
   const systemPrompt = loadSystemPrompt();
-
-  const hasUpdateIntent = UPDATE_KEYWORDS.some(k => userMessage.toLowerCase().includes(k));
-  if (hasUpdateIntent) {
-    try {
-      console.log('[agent] prefetching tasks for update intent');
-      const tasks = await readNotionTasks();
-      const taskContext = tasks.map(t => `- "${t.name}" | id: ${t.id} | status: ${t.status} | priority: ${t.priority}`).join('\n');
-      userMessage = `[current tasks with ids]\n${taskContext}\n\n${userMessage}`;
-    } catch (err) {
-      console.warn('[agent] task prefetch failed:', err);
-    }
-  }
 
   const messages: Anthropic.MessageParam[] = [
     ...history.map((msg, i) => ({
@@ -80,14 +65,19 @@ export async function runAgentLoop(
     { role: 'user', content: userMessage },
   ];
 
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
+  let iteration = 0;
+  while (true) {
+    if (iteration >= MAX_ITERATIONS) throw new Error('Agent loop exceeded maximum iterations');
+
     const response = await client.messages.create({
       model: 'claude-sonnet-4-5',
       max_tokens: 4096,
       system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       tools: allTools,
+      tool_choice: iteration === 0 ? { type: 'any' } : { type: 'auto' },
       messages,
     });
+    iteration++;
 
     if (response.stop_reason === 'end_turn') {
       const text = response.content.find(b => b.type === 'text');
@@ -133,6 +123,4 @@ export async function runAgentLoop(
 
     throw new Error(`Unexpected stop reason: ${response.stop_reason}`);
   }
-
-  throw new Error('Agent loop exceeded maximum iterations');
 }
