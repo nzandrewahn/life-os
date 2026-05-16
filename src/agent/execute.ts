@@ -2,14 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { appendFileSync } from 'fs';
 import { join } from 'path';
 import { buildNote, readNote, writeNote, appendToNote } from '../integrations/obsidian';
-import {
-  queryTasks,
-  createTask,
-  createSubtask,
-  updateTaskStatus,
-  decomposeTask,
-  pageIdFromUrl,
-} from '../integrations/notion';
+import { isNotionTool, callNotionTool } from '../integrations/notion-mcp';
 import { queryIndex, insertIndex } from '../memory/obsidian-index';
 import { createReminder as iCloudCreateReminder } from '../integrations/reminders';
 import {
@@ -24,15 +17,9 @@ const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_AN
 type ToolInput = Record<string, unknown>;
 
 export async function executeTool(name: string, input: ToolInput): Promise<unknown> {
+  if (isNotionTool(name)) return callNotionTool(name, input);
+
   switch (name) {
-    case 'read_notion_tasks':          return execReadNotionTasks(input);
-    case 'decompose_task':             return execDecomposeTask(input);
-    case 'write_notion_task':          return execWriteNotionTask(input);
-    case 'write_notion_subtask':       return execWriteNotionSubtask(input);
-    case 'update_notion_task_status':  return execUpdateNotionTaskStatus(input);
-    case 'read_notion_project':        return readNotionProject(input);
-    case 'read_notion_programs':       return readNotionPrograms(input);
-    case 'write_notion_inspiration':   return writeNotionInspiration(input);
     case 'read_supabase_history':    return readSupabaseHistory(input);
     case 'write_supabase_capture':   return writeSupabaseCapture(input);
     case 'write_supabase_life_task': return writeSupabaseLifeTask(input);
@@ -51,81 +38,6 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
-}
-
-async function execReadNotionTasks(input: ToolInput) {
-  const tasks = await queryTasks(input.project as string | undefined);
-  return { count: tasks.length, tasks };
-}
-
-async function execDecomposeTask(input: ToolInput) {
-  return decomposeTask({
-    name: input.name as string,
-    timeEstimate: input.time_estimate as number | undefined,
-    why: input.why as string | undefined,
-  });
-}
-
-async function execWriteNotionTask(input: ToolInput) {
-  const task = await createTask({
-    name: input.name as string,
-    priority: input.priority as string | undefined,
-    project: input.project as string | undefined,
-    timeEstimate: input.time_estimate as number | undefined,
-    energy: input.energy as string | undefined,
-    why: input.why as string | undefined,
-    date: input.date as string | undefined,
-    status: input.status as string | undefined,
-  });
-  return { success: true, ...task, message: `task "${input.name}" created` };
-}
-
-async function execWriteNotionSubtask(input: ToolInput) {
-  const parentUrl = input.parent_url as string;
-  const parentPageId = pageIdFromUrl(parentUrl);
-  const subtask = await createSubtask({
-    name: input.name as string,
-    parentPageId,
-    priority: input.priority as string | undefined,
-    project: input.project as string | undefined,
-    timeEstimate: input.time_estimate as number | undefined,
-    energy: input.energy as string | undefined,
-    why: input.why as string | undefined,
-  });
-  return { success: true, ...subtask, message: `subtask "${input.name}" created under ${parentUrl}` };
-}
-
-async function execUpdateNotionTaskStatus(input: ToolInput) {
-  const pageId = pageIdFromUrl(input.page_url as string);
-  await updateTaskStatus(pageId, input.status as string);
-  return { success: true, message: `task status updated to "${input.status}"` };
-}
-
-async function readNotionProject(input: ToolInput) {
-  const { data, error } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('name', input.project as string)
-    .maybeSingle();
-  if (error) throw new Error(`projects query failed: ${error.message}`);
-  if (!data) return { found: false, message: `no project named "${input.project}" in database` };
-  return { found: true, ...data };
-}
-
-async function readNotionPrograms(input: ToolInput) {
-  const date = (input.date as string) ?? new Date().toISOString().split('T')[0];
-  return {
-    date,
-    training: 'no program set up yet',
-    sketching: 'no program set up yet',
-  };
-}
-
-async function writeNotionInspiration(input: ToolInput) {
-  return {
-    success: false,
-    message: 'Notion inspiration database not connected yet — save the URL to Obsidian instead using write_obsidian_note with folder 2.Notes/Learnings',
-  };
 }
 
 async function readSupabaseHistory(input: ToolInput) {

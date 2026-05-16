@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import { createBot } from './bot';
 import { startCrons } from './crons';
+import { initAgentTools } from './agent/loop';
 
 const PORT = process.env.PORT;
 if (!PORT) throw new Error('PORT environment variable is not set');
@@ -24,6 +25,7 @@ app.post('/webhook', (req, res) => {
 
 app.listen(Number(PORT), '0.0.0.0', async () => {
   console.log(`[startup] express listening on port ${PORT} (0.0.0.0)`);
+  await initAgentTools();
   startCrons(bot.telegram);
 
   if (webhookBase) {

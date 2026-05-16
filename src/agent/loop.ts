@@ -3,10 +3,25 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { TOOLS } from './tools';
 import { executeTool } from './execute';
+import { loadNotionTools } from '../integrations/notion-mcp';
 import type { DbMessage } from '../types';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MAX_ITERATIONS = 10;
+
+// Andrew Task Board data source — injected into system prompt so Claude knows where to read/write tasks
+const NOTION_CONTEXT = `\n\n## notion task board\n\ndata source id: 275237a5-f577-80fa-b074-000b071090b7\nto read tasks: notion-fetch with id "collection://275237a5-f577-80fa-b074-000b071090b7". to create tasks: notion-create-pages with parent { type: "data_source_id", data_source_id: "275237a5-f577-80fa-b074-000b071090b7" }. to update status: notion-update-page with command "update_properties". properties: Name (title), Status (Not started/In progress/Paused/Done), Priority (Critical/High/Normal/Low), Energy (Low/Medium/High), Project (Lost Marbles/Abstracted Objects/Blender/Sketching/Personal/Other), Time Estimate (number hours), Why (text), Date (date YYYY-MM-DD). when reading tasks filter out Status=Done and parent tasks that have sub-items. sort by priority (Critical first) then energy (High last).`;
+
+let allTools: Anthropic.Tool[] = [...TOOLS];
+
+export async function initAgentTools(): Promise<void> {
+  try {
+    const notionTools = await loadNotionTools();
+    allTools = [...TOOLS, ...notionTools];
+  } catch (err) {
+    console.error('[agent] failed to load Notion MCP tools:', err instanceof Error ? err.message : err);
+  }
+}
 
 function loadSystemPrompt(): string {
   let base: string;
@@ -17,11 +32,11 @@ function loadSystemPrompt(): string {
   }
   try {
     const updates = readFileSync(join(process.cwd(), 'context-updates.md'), 'utf-8');
-    if (updates.trim()) return `${base}\n\n## dynamic context updates\n\n${updates}`;
+    if (updates.trim()) return `${base}${NOTION_CONTEXT}\n\n## dynamic context updates\n\n${updates}`;
   } catch {
     // file doesn't exist yet — skip silently
   }
-  return base;
+  return `${base}${NOTION_CONTEXT}`;
 }
 
 export async function runAgentLoop(
@@ -33,7 +48,6 @@ export async function runAgentLoop(
   const messages: Anthropic.MessageParam[] = [
     ...history.map((msg, i) => ({
       role: msg.role as 'user' | 'assistant',
-      // Cache the last history message — stable context that won't change this run
       content: i === history.length - 1
         ? [{ type: 'text' as const, text: msg.content, cache_control: { type: 'ephemeral' as const } }]
         : msg.content,
@@ -46,7 +60,7 @@ export async function runAgentLoop(
       model: 'claude-sonnet-4-5',
       max_tokens: 4096,
       system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
-      tools: TOOLS,
+      tools: allTools,
       messages,
     });
 
