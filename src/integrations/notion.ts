@@ -53,7 +53,8 @@ function mapTask(page: Record<string, unknown>): NotionTask {
     status: (props['Status']?.status as { name?: string } | null)?.name ?? '',
     priority: getPropText(props['Priority'] ?? {}),
     energy: (props['Energy']?.select as { name?: string } | null)?.name ?? '',
-    project: (props['Project']?.select as { name?: string } | null)?.name ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    project: (page as any).properties?.Project?.select?.name || null,
     timeEstimate: (props['Time Estimate']?.number as number | null) ?? null,
     why: getPropText(props['Why'] ?? {}),
     date: getPropText(props['Date'] ?? {}) || null,
