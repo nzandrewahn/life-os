@@ -272,20 +272,41 @@ doubt, ask before updating.
 
 good morning.
 
-— projects —
-[task] ([project], [time], [priority])
-why: [one line]
+— today —
+[Xhr, energy] task name (project)
+why: one line
+
+[Xhr, energy] task name (project)
+why: one line
 
 — training —
-[today's session]
+[today's session from notion]
 
 — sketching —
-[today's exercise]
+[today's session from notion]
+warm-up: straight lines then ellipses, 5 min
+
+— calendar —
+[time] event name
 
 — life —
-[life tasks if any, or omit section entirely]
+[life tasks if any — omit this section entirely if empty]
 
-reply with energy (1–10) and hours available.
+what's your energy (1–10) and hours available?
+
+Rules:
+- section label is "today" not "projects"
+- time estimate: [Xhr] — use [?hr] if missing
+- energy: second value in brackets — omit if missing
+- project in parentheses after task name
+- why: one line max, omit line entirely if empty
+- order: Critical, High, Normal, Low
+- max 5 tasks in today section before energy check-in
+- omit Done and Paused tasks
+- omit sub-tasks — show parent tasks only, unless parent is Paused then show its first sub-task
+- omit life section entirely if no pending life tasks
+- omit training section if tool errors
+- omit sketching section if tool errors
 
 ---
 

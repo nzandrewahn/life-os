@@ -48,7 +48,48 @@ async function runMorningBrief(telegram: Telegram): Promise<void> {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: AUCKLAND });
 
   const brief = await runAgentLoop(
-    `generate morning brief for ${today}. call read_training_today and read_sketching_today. read notion tasks (fetch the andrew task board, filter out done tasks and parent tasks with sub-items, sort by priority then energy). read google calendar for today. read pending life tasks from supabase. format exactly as:\n\ngood morning.\n\n— today —\n[task lines: Xh task name (project)]\n\n— calendar —\n[event lines: time title]\n\n— training —\n[session description, or "rest day"]\n\n— sketching —\n[warm-up note then session title]\n\nXh of tasks open\n\nreply with energy (1–10) and hours available.\n\nall lowercase, no asterisks, no markdown, no commentary.`,
+    `generate morning brief for ${today}.
+
+steps:
+1. call read_notion_tasks — get all open tasks
+2. call read_training_today — get today's session
+3. call read_sketching_today — get today's sketching session
+4. call read_google_calendar with days=1 — get today's events
+5. call read_supabase_history with days=1 — get any pending life tasks mentioned recently
+
+format exactly as shown below. all lowercase. no asterisks. no markdown symbols. no commentary.
+
+good morning.
+
+— today —
+[for each task, up to 5: Critical first, then High, then Normal, then Low. omit Done and Paused. omit sub-tasks — show parent tasks only, unless the parent is Paused then show first sub-task instead]
+[Xhr, energy] task name (project)
+why: one line
+
+[Xhr, energy] task name (project)
+why: one line
+
+— training —
+[session text from read_training_today, or omit this section entirely if the tool errored]
+
+— sketching —
+[session title from read_sketching_today, or omit this section entirely if the tool errored]
+warm-up: straight lines then ellipses, 5 min
+
+— calendar —
+[time] event name
+
+— life —
+[pending life tasks if any — omit this section entirely if none]
+
+what's your energy (1–10) and hours available?
+
+field rules:
+- time estimate: show as [Xhr] — use [?hr] if missing
+- energy: show as second value in brackets [Xhr, energy] — omit energy bracket value if missing
+- project: in parentheses after task name
+- why: one line max, omit the line if why field is empty
+- max 5 tasks total in today section`,
     [],
   );
 

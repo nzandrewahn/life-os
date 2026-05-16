@@ -52,11 +52,9 @@ function mapTask(page: Record<string, unknown>): NotionTask {
     name: getPropText(props['Name'] ?? {}),
     status: getPropText(props['Status'] ?? {}),
     priority: getPropText(props['Priority'] ?? {}),
-    energy: getPropText(props['Energy'] ?? {}),
+    energy: (props['Energy']?.select as { name?: string } | null)?.name ?? '',
     project: getPropText(props['Project'] ?? {}),
-    timeEstimate: props['Time Estimate']
-      ? ((props['Time Estimate'].number as number | null) ?? null)
-      : null,
+    timeEstimate: (props['Time Estimate']?.number as number | null) ?? null,
     why: getPropText(props['Why'] ?? {}),
     date: getPropText(props['Date'] ?? {}) || null,
   };
@@ -261,8 +259,8 @@ export async function readTrainingToday(): Promise<TrainingResult> {
     timeZone: 'Pacific/Auckland',
   });
 
-  if (today === 'Friday') {
-    return { rest_day: true, day: 'Friday', session: 'rest day' };
+  if (today === 'Friday' || today === 'Sunday') {
+    return { rest_day: true, day: today, session: 'rest day' };
   }
 
   const entries = await collectTrainingEntries(pageId);
