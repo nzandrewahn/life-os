@@ -4,8 +4,6 @@ const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
 console.log('[notion] client methods:', typeof notion.databases?.query);
 
-const TASKS_DB_ID = process.env.NOTION_TASKS_DB_ID ?? '275237a5f577800e8254f56b93e97a31';
-const SKETCHING_DB_ID = process.env.NOTION_SKETCHING_DB_ID ?? '4cda0f06-fd18-488c-a65e-496e0a463ff7';
 const TRAINING_PAGE_ID = process.env.NOTION_TRAINING_PAGE_ID ?? '';
 
 const WARMUP = 'warm-up: rows of straight lines (horizontal, vertical, 45°, diagonal) then ellipses at different angles. 5 min.';
@@ -16,7 +14,7 @@ export interface NotionTask {
   status: string;
   priority: string;
   energy: string;
-  project: string;
+  project: string | null;
   timeEstimate: number | null;
   why: string;
   date: string | null;
@@ -55,7 +53,7 @@ function mapTask(page: Record<string, unknown>): NotionTask {
     status: (props['Status']?.status as { name?: string } | null)?.name ?? '',
     priority: getPropText(props['Priority'] ?? {}),
     energy: (props['Energy']?.select as { name?: string } | null)?.name ?? '',
-    project: getPropText(props['Project'] ?? {}),
+    project: (props['Project']?.select as { name?: string } | null)?.name ?? null,
     timeEstimate: (props['Time Estimate']?.number as number | null) ?? null,
     why: getPropText(props['Why'] ?? {}),
     date: getPropText(props['Date'] ?? {}) || null,
@@ -63,13 +61,8 @@ function mapTask(page: Record<string, unknown>): NotionTask {
 }
 
 export async function readNotionTasks(): Promise<NotionTask[]> {
-  const rawId = process.env.NOTION_TASKS_DB_ID || '275237a5f577800e8254f56b93e97a31';
-
-  // Format as UUID with dashes if not already
-  const dbId = rawId.includes('-') ? rawId
-    : `${rawId.slice(0, 8)}-${rawId.slice(8, 12)}-${rawId.slice(12, 16)}-${rawId.slice(16, 20)}-${rawId.slice(20)}`;
-
-  console.log('[notion] formatted db ID:', dbId);
+  const dbId = process.env.NOTION_TASKS_DB_ID!;
+  console.log('[notion] querying tasks db:', dbId);
 
   const response = await notion.databases.query({
     database_id: dbId,
@@ -110,7 +103,7 @@ export async function writeNotionTask(
   if (why) properties['Why'] = { rich_text: [{ text: { content: why } }] };
 
   const page = await notion.pages.create({
-    parent: { database_id: TASKS_DB_ID },
+    parent: { database_id: process.env.NOTION_TASKS_DB_ID! },
     properties: properties as never,
   });
   return { id: page.id };
@@ -136,8 +129,9 @@ export interface SketchingSession {
 }
 
 export async function readSketchingToday(): Promise<SketchingSession | { completed: true; message: string }> {
+  const sketchingDbId = process.env.NOTION_SKETCHING_DB_ID!;
   const response = await notion.databases.query({
-    database_id: SKETCHING_DB_ID,
+    database_id: sketchingDbId,
     filter: {
       property: 'Done',
       checkbox: { equals: false },
