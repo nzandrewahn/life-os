@@ -2,6 +2,8 @@ import { Client } from '@notionhq/client';
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
+console.log('[notion] client methods:', typeof notion.databases?.query);
+
 const TASKS_DB_ID = process.env.NOTION_TASKS_DB_ID ?? '275237a5f577800e8254f56b93e97a31';
 const SKETCHING_DB_ID = process.env.NOTION_SKETCHING_DB_ID ?? '4cda0f06-fd18-488c-a65e-496e0a463ff7';
 const TRAINING_PAGE_ID = process.env.NOTION_TRAINING_PAGE_ID ?? '';
@@ -69,8 +71,7 @@ export async function readNotionTasks(): Promise<NotionTask[]> {
 
   console.log('[notion] formatted db ID:', dbId);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const response = await (notion as any).databases.query({
+  const response = await notion.databases.query({
     database_id: dbId,
     filter: {
       property: 'Status',
@@ -107,7 +108,7 @@ export async function writeNotionTask(
   if (why) properties['Why'] = { rich_text: [{ text: { content: why } }] };
 
   const page = await notion.pages.create({
-    parent: { type: 'data_source_id', data_source_id: TASKS_DB_ID } as never,
+    parent: { database_id: TASKS_DB_ID },
     properties: properties as never,
   });
   return { id: page.id };
@@ -118,7 +119,7 @@ export async function updateNotionTaskStatus(pageId: string, status: string): Pr
     page_id: pageId,
     properties: {
       Status: { select: { name: status } },
-    } as never,
+    },
   });
 }
 
@@ -133,12 +134,12 @@ export interface SketchingSession {
 }
 
 export async function readSketchingToday(): Promise<SketchingSession | { completed: true; message: string }> {
-  const response = await notion.dataSources.query({
-    data_source_id: SKETCHING_DB_ID,
+  const response = await notion.databases.query({
+    database_id: SKETCHING_DB_ID,
     filter: {
       property: 'Done',
       checkbox: { equals: false },
-    } as never,
+    },
     sorts: [
       { property: 'Day Number', direction: 'ascending' },
     ],
@@ -172,7 +173,7 @@ export async function markSketchingDone(pageId: string): Promise<void> {
     page_id: pageId,
     properties: {
       Done: { checkbox: true },
-    } as never,
+    },
   });
 }
 
