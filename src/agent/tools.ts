@@ -43,7 +43,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'update_notion_task_status',
     description:
-      'Update the status of a task in the Andrew Task Board. Use when Andrew says he completed, paused, or started a task. Get the page_id from read_notion_tasks.',
+      'Update one or more fields on a task in the Andrew Task Board. Use when Andrew changes status, priority, energy, time estimate, or project. Get page_id from read_notion_tasks. All fields except page_id are optional — only pass what needs changing.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -51,10 +51,29 @@ export const TOOLS: Anthropic.Tool[] = [
         status: {
           type: 'string',
           enum: ['Not started', 'In progress', 'Paused', 'Done'],
-          description: 'New status value.',
+          description: 'New status.',
+        },
+        priority: {
+          type: 'string',
+          enum: ['Critical', 'High', 'Normal', 'Low'],
+          description: 'New priority.',
+        },
+        energy: {
+          type: 'string',
+          enum: ['Low', 'Medium', 'High'],
+          description: 'New energy level.',
+        },
+        time_estimate: {
+          type: 'number',
+          description: 'New time estimate in hours.',
+        },
+        project: {
+          type: 'string',
+          enum: ['Lost Marbles', 'Abstracted Objects', 'Blender', 'Sketching', 'Personal', 'Other'],
+          description: 'New project assignment.',
         },
       },
-      required: ['page_id', 'status'],
+      required: ['page_id'],
     },
   },
   {

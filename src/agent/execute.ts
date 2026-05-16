@@ -5,7 +5,7 @@ import { buildNote, readNote, writeNote, appendToNote } from '../integrations/ob
 import {
   readNotionTasks,
   writeNotionTask,
-  updateNotionTaskStatus,
+  updateNotionTask,
   readSketchingToday,
   markSketchingDone,
   readTrainingToday,
@@ -29,7 +29,7 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
   switch (name) {
     case 'read_notion_tasks':        return readNotionTasks();
     case 'write_notion_task':        return execWriteNotionTask(input);
-    case 'update_notion_task_status': return execUpdateNotionTaskStatus(input);
+    case 'update_notion_task_status': return execUpdateNotionTask(input);
     case 'read_supabase_history':    return readSupabaseHistory(input);
     case 'write_supabase_capture':   return writeSupabaseCapture(input);
     case 'write_supabase_life_task': return writeSupabaseLifeTask(input);
@@ -72,9 +72,19 @@ async function execWriteNotionTask(input: ToolInput) {
   };
 }
 
-async function execUpdateNotionTaskStatus(input: ToolInput) {
-  await updateNotionTaskStatus(input.page_id as string, input.status as string);
-  return { success: true, message: `task ${input.page_id} status updated to "${input.status}"` };
+async function execUpdateNotionTask(input: ToolInput) {
+  await updateNotionTask(input.page_id as string, {
+    status:       input.status        as string | undefined,
+    priority:     input.priority      as string | undefined,
+    energy:       input.energy        as string | undefined,
+    timeEstimate: input.time_estimate as number | undefined,
+    project:      input.project       as string | undefined,
+  });
+  const updated = ['status', 'priority', 'energy', 'time_estimate', 'project']
+    .filter(k => input[k] != null)
+    .map(k => `${k}: ${input[k]}`)
+    .join(', ');
+  return { success: true, message: `task updated — ${updated}` };
 }
 
 async function readSupabaseHistory(input: ToolInput) {

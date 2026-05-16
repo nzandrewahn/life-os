@@ -169,13 +169,24 @@ export async function writeNotionTask(
   return { id: page.id, title, project: finalProject, priority: finalPriority, timeEstimate: finalTimeEstimate, energy: finalEnergy };
 }
 
-export async function updateNotionTaskStatus(pageId: string, status: string): Promise<void> {
-  await notion.pages.update({
-    page_id: pageId,
-    properties: {
-      Status: { status: { name: status } },
-    },
-  });
+export async function updateNotionTask(
+  pageId: string,
+  fields: {
+    status?: string;
+    priority?: string;
+    energy?: string;
+    timeEstimate?: number;
+    project?: string;
+  },
+): Promise<void> {
+  const properties: Record<string, unknown> = {};
+  if (fields.status)       properties['Status']        = { status: { name: fields.status } };
+  if (fields.priority)     properties['Priority']      = { select: { name: fields.priority } };
+  if (fields.energy)       properties['Energy']        = { select: { name: fields.energy } };
+  if (fields.project)      properties['Project']       = { select: { name: fields.project } };
+  if (fields.timeEstimate != null) properties['Time Estimate'] = { number: fields.timeEstimate };
+
+  await notion.pages.update({ page_id: pageId, properties: properties as never });
 }
 
 // ─── Sketching ────────────────────────────────────────────────────────────────
