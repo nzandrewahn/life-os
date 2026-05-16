@@ -126,13 +126,15 @@ export async function readSketchingToday(): Promise<SketchingSession | { complet
     data_source_id: SKETCHING_DB_ID,
     filter: {
       property: 'Done',
-      select: { does_not_equal: '__YES__' },
-    },
+      checkbox: { equals: false },
+    } as never,
     sorts: [
       { property: 'Day Number', direction: 'ascending' },
     ],
     page_size: 1,
   });
+
+  console.log('[notion] readSketchingToday raw response:', JSON.stringify(response).slice(0, 500));
 
   if (!response.results.length) {
     return { completed: true, message: 'all sketching sessions completed — programme finished!' };
@@ -140,7 +142,7 @@ export async function readSketchingToday(): Promise<SketchingSession | { complet
 
   const page = response.results[0] as Record<string, unknown>;
   const props = page.properties as Record<string, Record<string, unknown>>;
-  const title = getPropText(props['Name'] ?? props['Title'] ?? {});
+  const title = getPropText(props['Day'] ?? props['Name'] ?? props['Title'] ?? {});
   const dayMatch = title.match(/^Day (\d+)/i);
   const dayNum = dayMatch ? parseInt(dayMatch[1], 10) : 0;
   const week = getPropText(props['Week'] ?? {}) || null;
@@ -158,18 +160,86 @@ export async function markSketchingDone(pageId: string): Promise<void> {
   await notion.pages.update({
     page_id: pageId,
     properties: {
-      Done: { select: { name: '__YES__' } },
+      Done: { checkbox: true },
     } as never,
   });
 }
 
 // ─── Training ─────────────────────────────────────────────────────────────────
 
-export interface TrainingDay {
-  checked: boolean;
+type NotionBlock = {
+  id: string;
+  type: string;
+  has_children?: boolean;
+  [key: string]: unknown;
+};
+
+async function fetchBlockChildren(blockId: string): Promise<NotionBlock[]> {
+  const blocks: NotionBlock[] = [];
+  let cursor: string | undefined;
+  do {
+    const resp = await notion.blocks.children.list({
+      block_id: blockId,
+      page_size: 100,
+      ...(cursor ? { start_cursor: cursor } : {}),
+    });
+    blocks.push(...(resp.results as NotionBlock[]));
+    cursor = resp.has_more && resp.next_cursor ? resp.next_cursor : undefined;
+  } while (cursor);
+  return blocks;
+}
+
+function richText(block: NotionBlock): string {
+  const data = block[block.type] as { rich_text?: Array<{ plain_text: string }> } | undefined;
+  return data?.rich_text?.map(t => t.plain_text).join('') ?? '';
+}
+
+interface TrainingEntry {
+  weekNum: number;
   day: string;
   session: string;
-  rawLine: string;
+  checked: boolean;
+  blockId: string;
+}
+
+async function collectTrainingEntries(pageId: string): Promise<TrainingEntry[]> {
+  const entries: TrainingEntry[] = [];
+  let currentWeek = 0;
+
+  const topBlocks = await fetchBlockChildren(pageId);
+
+  for (const block of topBlocks) {
+    if (['heading_1', 'heading_2', 'heading_3'].includes(block.type)) {
+      const text = richText(block);
+      const m = text.match(/Week\s+(\d+)/i);
+      if (m) currentWeek = parseInt(m[1], 10);
+    }
+
+    if (block.type === 'column_list') {
+      const columns = await fetchBlockChildren(block.id);
+      for (const col of columns) {
+        if (col.type !== 'column') continue;
+        const colBlocks = await fetchBlockChildren(col.id);
+        for (const cb of colBlocks) {
+          if (cb.type !== 'to_do') continue;
+          const todo = cb.to_do as { checked: boolean; rich_text: Array<{ plain_text: string }> };
+          const text = todo.rich_text.map(t => t.plain_text).join('');
+          // expect "Monday: 5km easy" or "Monday: rest"
+          const m = text.match(/^(\w+):\s*(.+)$/i);
+          if (!m) continue;
+          entries.push({
+            weekNum: currentWeek,
+            day: m[1],
+            session: m[2].trim(),
+            checked: todo.checked,
+            blockId: cb.id,
+          });
+        }
+      }
+    }
+  }
+
+  return entries;
 }
 
 export interface TrainingResult {
@@ -178,48 +248,13 @@ export interface TrainingResult {
   week?: number;
   day?: string;
   session?: string;
-  full_checkbox_line?: string;
-  training_page_id?: string;
-  mark_done_instruction?: string;
+  to_do_block_id?: string;
   error?: string;
-}
-
-function parseTrainingWeeks(content: string): Array<{ weekNum: number; days: TrainingDay[] }> {
-  const weeks: Array<{ weekNum: number; days: TrainingDay[] }> = [];
-  const columnRegex = /<column>([\s\S]*?)<\/column>/g;
-  let colMatch;
-
-  while ((colMatch = columnRegex.exec(content)) !== null) {
-    const col = colMatch[1];
-    const weekMatch = col.match(/\*\*Week (\d+)/);
-    if (!weekMatch) continue;
-    const weekNum = parseInt(weekMatch[1], 10);
-
-    const cbRegex = /^([ \t]*- \[([ x])\] \*\*(\w+):\*\* .+)$/gm;
-    const days: TrainingDay[] = [];
-    let cb;
-
-    while ((cb = cbRegex.exec(col)) !== null) {
-      const rawLine = cb[1];
-      const checked = cb[2] === 'x';
-      const day = cb[3];
-      const sessionMatch = rawLine.match(/\*\*\w+:\*\* (.+)$/);
-      const session = sessionMatch ? sessionMatch[1].trim() : '';
-      days.push({ checked, day, session, rawLine });
-    }
-
-    if (days.length > 0) weeks.push({ weekNum, days });
-  }
-
-  return weeks.sort((a, b) => a.weekNum - b.weekNum);
 }
 
 export async function readTrainingToday(): Promise<TrainingResult> {
   const pageId = TRAINING_PAGE_ID;
   if (!pageId) throw new Error('NOTION_TRAINING_PAGE_ID is not set');
-
-  const page = await notion.pages.retrieveMarkdown({ page_id: pageId });
-  const content = typeof page === 'string' ? page : JSON.stringify(page);
 
   const today = new Date().toLocaleDateString('en-NZ', {
     weekday: 'long',
@@ -230,21 +265,21 @@ export async function readTrainingToday(): Promise<TrainingResult> {
     return { rest_day: true, day: 'Friday', session: 'rest day' };
   }
 
-  const weeks = parseTrainingWeeks(content);
+  const entries = await collectTrainingEntries(pageId);
+  console.log(`[notion] readTrainingToday: ${entries.length} to_do blocks found`);
 
+  // Current week = week of the last checked session (default week 1)
   let currentWeekNum = 1;
-  for (const week of weeks) {
-    for (const day of week.days) {
-      if (day.checked) currentWeekNum = week.weekNum;
-    }
+  for (const e of entries) {
+    if (e.checked) currentWeekNum = e.weekNum;
   }
 
-  const currentWeek = weeks.find(w => w.weekNum === currentWeekNum);
-  if (!currentWeek) {
-    return { rest_day: false, error: `week ${currentWeekNum} not found in training plan` };
+  const weekEntries = entries.filter(e => e.weekNum === currentWeekNum);
+  if (!weekEntries.length) {
+    return { rest_day: false, error: `no entries found for week ${currentWeekNum}` };
   }
 
-  const todayEntry = currentWeek.days.find(d => d.day.toLowerCase() === today.toLowerCase());
+  const todayEntry = weekEntries.find(e => e.day.toLowerCase() === today.toLowerCase());
 
   if (!todayEntry || /^rest$/i.test(todayEntry.session)) {
     return { rest_day: true, day: today, week: currentWeekNum, session: 'rest day' };
@@ -256,16 +291,13 @@ export async function readTrainingToday(): Promise<TrainingResult> {
     week: currentWeekNum,
     day: today,
     session: todayEntry.session,
-    full_checkbox_line: todayEntry.rawLine,
-    training_page_id: pageId,
-    mark_done_instruction: `call notion pages.update with page_id "${pageId}" to replace the checkbox line`,
+    to_do_block_id: todayEntry.blockId,
   };
 }
 
-export async function markTrainingDone(pageId: string, rawLine: string): Promise<void> {
-  const doneLine = rawLine.replace('- [ ]', '- [x]');
-  await notion.pages.updateMarkdown({
-    page_id: pageId,
-    markdown: doneLine,
+export async function markTrainingDone(blockId: string): Promise<void> {
+  await notion.blocks.update({
+    block_id: blockId,
+    to_do: { checked: true },
   } as never);
 }

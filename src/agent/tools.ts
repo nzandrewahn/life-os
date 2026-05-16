@@ -60,7 +60,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'read_training_today',
     description:
-      'Read today\'s scheduled training session from the 16-week half marathon plan. Fetches the Notion training page, finds the last completed checkbox to determine the current week, then returns the session for today\'s day of the week. Returns rest_day: true on Fridays or if the plan has no session scheduled. Also returns the exact page ID and checkbox line needed to mark it done — when Andrew says he completed training, call notion-update-page with command "update_content" to replace the `[ ]` with `[x]` in the full_checkbox_line. Include in morning brief under — training —.',
+      'Read today\'s scheduled training session from the 16-week half marathon plan. Fetches the Notion training page blocks, finds the last completed to_do to determine the current week, then returns the session for today\'s day of the week. Returns rest_day: true on Fridays or if no session is scheduled. Returns to_do_block_id — when Andrew says he completed training, call mark_training_done with that block ID. Include in morning brief under — training —.',
     input_schema: {
       type: 'object' as const,
       properties: {},
@@ -68,13 +68,37 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'mark_training_done',
+    description:
+      'Mark today\'s training session as completed. Call this when Andrew says he finished his training. Pass the to_do_block_id returned by read_training_today.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        block_id: { type: 'string', description: 'The to_do block ID from read_training_today.' },
+      },
+      required: ['block_id'],
+    },
+  },
+  {
     name: 'read_sketching_today',
     description:
-      'Read the next incomplete sketching session from the Sketching Programme database (ordered by Day Number). Returns the session title, which week it belongs to, and the page ID. Always prepends the 5-min warm-up note. Include in morning brief under — sketching —. When Andrew says he completed his sketching session, call notion-update-page with command "update_properties" and properties: { Done: "__YES__" } on the returned page_id.',
+      'Read the next incomplete sketching session from the Sketching Programme database (ordered by Day Number). Returns the session title, which week it belongs to, and the page_id. Always prepends the 5-min warm-up note. Include in morning brief under — sketching —. When Andrew says he completed his sketching session, call mark_sketching_done with the returned page_id.',
     input_schema: {
       type: 'object' as const,
       properties: {},
       required: [],
+    },
+  },
+  {
+    name: 'mark_sketching_done',
+    description:
+      'Mark a sketching session as completed. Call this when Andrew says he finished his sketching. Pass the page_id returned by read_sketching_today.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        page_id: { type: 'string', description: 'The page ID from read_sketching_today.' },
+      },
+      required: ['page_id'],
     },
   },
   {
