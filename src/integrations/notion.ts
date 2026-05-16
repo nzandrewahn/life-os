@@ -153,7 +153,7 @@ export async function writeNotionTask(
 
   const properties: Record<string, unknown> = {
     Name: { title: [{ text: { content: title } }] },
-    Status: { select: { name: 'Not started' } },
+    Status: { status: { name: 'Not started' } },
     Priority: { select: { name: finalPriority } },
     'Time Estimate': { number: finalTimeEstimate },
     Energy: { select: { name: finalEnergy } },
@@ -173,7 +173,7 @@ export async function updateNotionTaskStatus(pageId: string, status: string): Pr
   await notion.pages.update({
     page_id: pageId,
     properties: {
-      Status: { select: { name: status } },
+      Status: { status: { name: status } },
     },
   });
 }
