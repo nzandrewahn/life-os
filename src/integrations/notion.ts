@@ -52,7 +52,7 @@ function mapTask(page: Record<string, unknown>): NotionTask {
   return {
     id: page.id as string,
     name: getPropText(props['Name'] ?? {}),
-    status: getPropText(props['Status'] ?? {}),
+    status: (props['Status']?.status as { name?: string } | null)?.name ?? '',
     priority: getPropText(props['Priority'] ?? {}),
     energy: (props['Energy']?.select as { name?: string } | null)?.name ?? '',
     project: getPropText(props['Project'] ?? {}),
@@ -73,20 +73,22 @@ export async function readNotionTasks(): Promise<NotionTask[]> {
 
   const response = await notion.databases.query({
     database_id: dbId,
-    filter: {
-      property: 'Status',
-      select: { does_not_equal: 'Done' },
-    },
-    sorts: [
-      { property: 'Priority', direction: 'ascending' },
-    ],
+    sorts: [{ property: 'Priority', direction: 'ascending' }],
   });
 
-  console.log('[notion] tasks found:', (response.results as Record<string, unknown>[]).map(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const active = response.results.filter(page => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const status = (page as any).properties?.Status?.status?.name;
+    return status !== 'Done';
+  });
+
+  console.log('[notion] tasks found:', active.length, 'active (of', response.results.length, 'total)');
+  console.log('[notion] task names:', (active as Record<string, unknown>[]).map(
     p => ((p.properties as Record<string, Record<string, unknown>>)['Name']?.title as Array<{ plain_text: string }>)?.[0]?.plain_text
   ));
 
-  return (response.results as Record<string, unknown>[]).map(mapTask);
+  return (active as Record<string, unknown>[]).map(mapTask);
 }
 
 export async function writeNotionTask(
