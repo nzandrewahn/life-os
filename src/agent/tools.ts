@@ -2,57 +2,106 @@ import type Anthropic from '@anthropic-ai/sdk';
 
 export const TOOLS: Anthropic.Tool[] = [
   {
-    name: 'read_project_tasks',
+    name: 'read_notion_tasks',
     description:
-      'Read active project tasks from Supabase, ordered by priority (critical → high → normal → low). Optionally filter by project name. Returns each task with title, project, effort, time estimate, priority, status, and why. Call this at the start of morning briefs, when the user asks about their workload, or when planning a day.',
+      'Read all active tasks from the Andrew Task Board in Notion (Status != Done). Returns each task with: name, status, priority, project, time estimate, energy, why, date, page URL, whether it has sub-items. Sorted by priority (Critical first) then energy (High last — save for good energy days). Call this when the user asks about their workload, when planning a day, or when identifying a task to update.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        date: {
-          type: 'string',
-          description: 'ISO date (YYYY-MM-DD). Defaults to today.',
-        },
         project: {
           type: 'string',
-          description: 'Optional project name to filter by.',
+          enum: ['Lost Marbles', 'Abstracted Objects', 'Blender', 'Sketching', 'Personal', 'Other'],
+          description: 'Optional project filter.',
         },
       },
       required: [],
     },
   },
   {
-    name: 'write_notion_task',
+    name: 'decompose_task',
     description:
-      'Create a new task in Notion. Use this for anything actionable that belongs to an active project — work deliverables, creative tasks, project milestones. Do NOT use for personal errands, groceries, admin, or anything not tied to a named project. Always include effort, time_estimate, priority, and why.',
+      'Analyze a task to determine if it is atomic (create directly) or abstract (needs breakdown). Call this BEFORE write_notion_task for any task where: time estimate is over 2.5 hours, no estimate is given, or the verb is broad (build, develop, create, launch, design, set up, plan, system, campaign). Returns {atomic: true} if the task can be created directly. Returns {atomic: false, breakdown: {phases: [...]}} if the task should be broken into subtasks — in this case, show the breakdown to the user and ask "add all, just phase 1, or want to adjust?" before creating anything.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        title: { type: 'string', description: 'Task name.' },
-        project: { type: 'string', description: 'Project this task belongs to.' },
-        effort: {
+        name: { type: 'string', description: 'Task name to analyze.' },
+        time_estimate: { type: 'number', description: 'Estimated hours (if known).' },
+        why: { type: 'string', description: 'Why this task matters (if known).' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'write_notion_task',
+    description:
+      'Create a new task in the Andrew Task Board in Notion. Only call this AFTER decompose_task has confirmed the task is atomic, or after the user has confirmed a decomposition breakdown. For abstract tasks being created as parents, set status to "Paused". Do NOT use for personal errands — those go to write_supabase_life_task.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: { type: 'string', description: 'Task name.' },
+        project: {
           type: 'string',
-          enum: ['Low', 'Medium', 'High'],
-          description: 'Effort level.',
-        },
-        time_estimate: {
-          type: 'number',
-          description: 'Hours (0.5, 1, 2, etc.).',
+          enum: ['Lost Marbles', 'Abstracted Objects', 'Blender', 'Sketching', 'Personal', 'Other'],
+          description: 'Project this task belongs to.',
         },
         priority: {
           type: 'string',
           enum: ['Critical', 'High', 'Normal', 'Low'],
           description: 'Priority level.',
         },
-        why: {
+        energy: {
           type: 'string',
-          description: 'One sentence — why this task matters.',
+          enum: ['Low', 'Medium', 'High'],
+          description: 'Energy required to do this task.',
         },
-        due: {
+        time_estimate: { type: 'number', description: 'Hours (0.5, 1, 2, etc.).' },
+        why: { type: 'string', description: 'One sentence — why this task matters.' },
+        date: { type: 'string', description: 'Optional due date (YYYY-MM-DD).' },
+        status: {
           type: 'string',
-          description: 'Optional due date (YYYY-MM-DD).',
+          enum: ['Not started', 'In progress', 'Paused'],
+          description: 'Initial status. Use "Paused" for parent tasks awaiting subtask completion.',
         },
       },
-      required: ['title', 'project', 'effort', 'time_estimate', 'priority', 'why'],
+      required: ['name', 'priority'],
+    },
+  },
+  {
+    name: 'write_notion_subtask',
+    description:
+      'Create a subtask under a parent task in Notion. Use after the user confirms a decomposition breakdown — call this once for each subtask in the breakdown. The parent_url comes from the write_notion_task call that created the parent.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: { type: 'string', description: 'Subtask name.' },
+        parent_url: { type: 'string', description: 'Notion URL of the parent task.' },
+        priority: { type: 'string', enum: ['Critical', 'High', 'Normal', 'Low'] },
+        energy: { type: 'string', enum: ['Low', 'Medium', 'High'] },
+        time_estimate: { type: 'number', description: 'Hours.' },
+        why: { type: 'string', description: 'Why this subtask matters.' },
+        project: {
+          type: 'string',
+          enum: ['Lost Marbles', 'Abstracted Objects', 'Blender', 'Sketching', 'Personal', 'Other'],
+        },
+      },
+      required: ['name', 'parent_url'],
+    },
+  },
+  {
+    name: 'update_notion_task_status',
+    description:
+      'Update the Status of a task in the Andrew Task Board. Use when Andrew says "done with X", "finished X", "mark X as complete" (→ Done), "working on X" (→ In progress), "pausing X" or "blocked on X" (→ Paused). Get the task URL from read_notion_tasks first if you don\'t already have it.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        page_url: { type: 'string', description: 'Notion page URL of the task to update.' },
+        status: {
+          type: 'string',
+          enum: ['Not started', 'In progress', 'Paused', 'Done'],
+          description: 'New status.',
+        },
+      },
+      required: ['page_url', 'status'],
     },
   },
   {

@@ -1,7 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
-import { appendFileSync, existsSync } from 'fs';
+import { appendFileSync } from 'fs';
 import { join } from 'path';
 import { buildNote, readNote, writeNote, appendToNote } from '../integrations/obsidian';
+import {
+  queryTasks,
+  createTask,
+  createSubtask,
+  updateTaskStatus,
+  decomposeTask,
+  pageIdFromUrl,
+} from '../integrations/notion';
 import { queryIndex, insertIndex } from '../memory/obsidian-index';
 import { createReminder as iCloudCreateReminder } from '../integrations/reminders';
 import {
@@ -17,11 +25,14 @@ type ToolInput = Record<string, unknown>;
 
 export async function executeTool(name: string, input: ToolInput): Promise<unknown> {
   switch (name) {
-    case 'read_project_tasks':        return readProjectTasks(input);
-    case 'write_notion_task':        return writeNotionTask(input);
-    case 'read_notion_project':      return readNotionProject(input);
-    case 'read_notion_programs':     return readNotionPrograms(input);
-    case 'write_notion_inspiration': return writeNotionInspiration(input);
+    case 'read_notion_tasks':          return execReadNotionTasks(input);
+    case 'decompose_task':             return execDecomposeTask(input);
+    case 'write_notion_task':          return execWriteNotionTask(input);
+    case 'write_notion_subtask':       return execWriteNotionSubtask(input);
+    case 'update_notion_task_status':  return execUpdateNotionTaskStatus(input);
+    case 'read_notion_project':        return readNotionProject(input);
+    case 'read_notion_programs':       return readNotionPrograms(input);
+    case 'write_notion_inspiration':   return writeNotionInspiration(input);
     case 'read_supabase_history':    return readSupabaseHistory(input);
     case 'write_supabase_capture':   return writeSupabaseCapture(input);
     case 'write_supabase_life_task': return writeSupabaseLifeTask(input);
@@ -42,37 +53,52 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
   }
 }
 
-const PRIORITY_RANK: Record<string, number> = { critical: 1, high: 2, normal: 3, low: 4 };
-function byPriority<T extends { priority?: string | null }>(a: T, b: T): number {
-  return (PRIORITY_RANK[(a.priority ?? '').toLowerCase()] ?? 5) -
-         (PRIORITY_RANK[(b.priority ?? '').toLowerCase()] ?? 5);
+async function execReadNotionTasks(input: ToolInput) {
+  const tasks = await queryTasks(input.project as string | undefined);
+  return { count: tasks.length, tasks };
 }
 
-async function readProjectTasks(input: ToolInput) {
-  const date = (input.date as string) ?? new Date().toISOString().split('T')[0];
-  let query = supabase
-    .from('project_tasks')
-    .select('id, title, project, effort, time_estimate, priority, status, why, due_date')
-    .neq('status', 'done');
-  if (input.project) query = query.eq('project', input.project as string);
-  const { data, error } = await query;
-  if (error) throw new Error(`project_tasks query failed: ${error.message}`);
-  return { date, tasks: (data ?? []).sort(byPriority) };
+async function execDecomposeTask(input: ToolInput) {
+  return decomposeTask({
+    name: input.name as string,
+    timeEstimate: input.time_estimate as number | undefined,
+    why: input.why as string | undefined,
+  });
 }
 
-async function writeNotionTask(input: ToolInput) {
-  const { data, error } = await supabase.from('project_tasks').insert({
-    title: input.title,
-    project: input.project,
-    effort: input.effort ?? null,
-    time_estimate: input.time_estimate ?? null,
-    priority: input.priority ?? 'Normal',
-    why: input.why ?? null,
-    due_date: input.due ?? null,
-    status: 'Not started',
-  }).select('id').single();
-  if (error) throw new Error(`project_tasks insert failed: ${error.message}`);
-  return { success: true, id: data.id, title: input.title, project: input.project, message: `task "${input.title}" created` };
+async function execWriteNotionTask(input: ToolInput) {
+  const task = await createTask({
+    name: input.name as string,
+    priority: input.priority as string | undefined,
+    project: input.project as string | undefined,
+    timeEstimate: input.time_estimate as number | undefined,
+    energy: input.energy as string | undefined,
+    why: input.why as string | undefined,
+    date: input.date as string | undefined,
+    status: input.status as string | undefined,
+  });
+  return { success: true, ...task, message: `task "${input.name}" created` };
+}
+
+async function execWriteNotionSubtask(input: ToolInput) {
+  const parentUrl = input.parent_url as string;
+  const parentPageId = pageIdFromUrl(parentUrl);
+  const subtask = await createSubtask({
+    name: input.name as string,
+    parentPageId,
+    priority: input.priority as string | undefined,
+    project: input.project as string | undefined,
+    timeEstimate: input.time_estimate as number | undefined,
+    energy: input.energy as string | undefined,
+    why: input.why as string | undefined,
+  });
+  return { success: true, ...subtask, message: `subtask "${input.name}" created under ${parentUrl}` };
+}
+
+async function execUpdateNotionTaskStatus(input: ToolInput) {
+  const pageId = pageIdFromUrl(input.page_url as string);
+  await updateTaskStatus(pageId, input.status as string);
+  return { success: true, message: `task status updated to "${input.status}"` };
 }
 
 async function readNotionProject(input: ToolInput) {

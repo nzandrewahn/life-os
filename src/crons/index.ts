@@ -5,13 +5,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { readCalendarEvents } from '../integrations/google-calendar';
+import { queryTasks } from '../integrations/notion';
 
 const AUCKLAND = 'Pacific/Auckland';
-const PRIORITY_RANK: Record<string, number> = { critical: 1, high: 2, normal: 3, low: 4 };
-function byPriority<T extends { priority?: string | null }>(a: T, b: T): number {
-  return (PRIORITY_RANK[(a.priority ?? '').toLowerCase()] ?? 5) -
-         (PRIORITY_RANK[(b.priority ?? '').toLowerCase()] ?? 5);
-}
 
 function getSupabase() {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
@@ -54,47 +50,55 @@ async function runMorningBrief(telegram: Telegram): Promise<void> {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: AUCKLAND });
 
   const [
-    { data: tasks },
+    notionTasks,
     { data: lifeTasks },
-    { data: history },
     events,
   ] = await Promise.all([
-    supabase
-      .from('project_tasks')
-      .select('title, project, priority, status, due_date')
-      .neq('status', 'done'),
+    queryTasks().catch(err => {
+      console.error('[cron] notion tasks fetch failed:', err.message);
+      return [];
+    }),
     supabase
       .from('life_tasks')
       .select('title, category, priority, due_date')
       .eq('status', 'pending'),
-    supabase
-      .from('messages')
-      .select('role, content, created_at')
-      .gte('created_at', new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString())
-      .order('created_at', { ascending: true }),
     readCalendarEvents(1).catch(err => {
       console.error('[cron] calendar fetch failed:', err.message);
       return [];
     }),
   ]);
 
-  const sortedTasks = (tasks ?? []).sort(byPriority);
+  // Show subtasks inline, skip parent tasks that have sub-items
+  const displayTasks = notionTasks.filter(t => !t.hasSubItems);
 
-  const prompt = `generate morning brief for ${today}.
+  const taskLines = displayTasks.map(t =>
+    `${t.timeEstimate ? `${t.timeEstimate}h` : '?h'} ${t.name}${t.project ? ` (${t.project})` : ''}${t.why ? `\n   why: ${t.why}` : ''}`
+  ).join('\n\n');
 
-project tasks (not done, ordered by priority):
-${JSON.stringify(sortedTasks, null, 2)}
+  const calendarLines = events.map(e =>
+    `${e.startAuckland} ${e.title}`
+  ).join('\n');
 
-today's calendar events:
-${JSON.stringify(events, null, 2)}
+  const lifeLines = (lifeTasks ?? []).map(t => `${t.title}`).join('\n');
 
-pending life tasks:
-${JSON.stringify(lifeTasks ?? [], null, 2)}
+  const totalEstimated = displayTasks.reduce((sum, t) => sum + (t.timeEstimate ?? 0), 0);
 
-recent conversation (last 3 days):
-${(history ?? []).map(m => `${m.role}: ${m.content}`).join('\n')}
+  const prompt = `generate a morning brief for ${today} in this exact format, all lowercase, no asterisks, no markdown:
 
-cover: main focus for today, calendar commitments, any open life tasks. keep it tight.`;
+good morning.
+
+— today —
+${taskLines || 'no open tasks'}
+
+— calendar —
+${calendarLines || 'nothing scheduled'}
+${lifeLines ? `\n— life —\n${lifeLines}` : ''}
+
+${totalEstimated}h of tasks open
+
+reply with energy (1–10) and hours available.
+
+keep it exactly as shown. do not add commentary, do not add headers like "**today**". output only the brief.`;
 
   const brief = await generateMessage(prompt);
   await telegram.sendMessage(getChatId(), brief);
