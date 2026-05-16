@@ -22,19 +22,48 @@ async function getClient(): Promise<Client> {
     );
   }
 
-  console.log('[notion-mcp] connecting with NOTION_API_KEY (length:', token.length, ')');
+  console.log('[notion-mcp] connecting to:', NOTION_MCP_URL);
+  console.log('[notion-mcp] auth header:', `Bearer ${token.slice(0, 15)}...`);
 
   mcpClient = new Client({ name: 'caterina', version: '1.0.0' });
 
   const transport = new StreamableHTTPClientTransport(
     new URL(NOTION_MCP_URL),
-    { requestInit: { headers: { Authorization: `Bearer ${token}` } } },
+    {
+      requestInit: {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Notion-Version': '2022-06-28',
+        },
+      },
+    },
   );
 
   try {
     await mcpClient.connect(transport);
   } catch (err) {
     mcpClient = null;
+    // Log as much detail as possible — status code, body, raw message
+    if (err && typeof err === 'object') {
+      const e = err as Record<string, unknown>;
+      console.error('[notion-mcp] connect failed');
+      if ('status' in e || 'statusCode' in e) {
+        console.error('[notion-mcp] status code:', e.status ?? e.statusCode);
+      }
+      if ('body' in e) {
+        console.error('[notion-mcp] response body:', JSON.stringify(e.body));
+      }
+      if ('message' in e) {
+        console.error('[notion-mcp] error message:', e.message);
+      }
+      // Log any remaining keys
+      const known = new Set(['status', 'statusCode', 'body', 'message', 'stack']);
+      const extra = Object.entries(e).filter(([k]) => !known.has(k));
+      if (extra.length) console.error('[notion-mcp] extra fields:', Object.fromEntries(extra));
+    } else {
+      console.error('[notion-mcp] connect failed (non-object error):', err);
+    }
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`[notion-mcp] connect failed: ${msg}`);
   }
