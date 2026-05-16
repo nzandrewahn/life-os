@@ -3,6 +3,7 @@ import { message } from 'telegraf/filters';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { runAgentLoop } from './agent/loop';
+import { generateMorningBrief } from './crons';
 import { logMessage, getRecentHistory } from './db';
 import { transcribeVoice } from './integrations/groq';
 import { formatForTelegram, escapeHtml } from './utils/formatter';
@@ -16,9 +17,19 @@ const CAPTURE_TRIGGERS = [
   'add task', 'add to', 'file this', 'log this',
 ];
 
+const MORNING_BRIEF_TRIGGERS = [
+  'morning brief', 'good morning', 'my brief',
+  'what do i have today', 'daily brief',
+];
+
 function isCaptureIntent(text: string): boolean {
   const lower = text.toLowerCase();
   return CAPTURE_TRIGGERS.some(trigger => lower.includes(trigger));
+}
+
+function isMorningBrief(text: string): boolean {
+  const lower = text.toLowerCase();
+  return MORNING_BRIEF_TRIGGERS.some(t => lower.includes(t));
 }
 
 interface PendingCapture {
@@ -96,6 +107,9 @@ async function handleIncoming(
         pendingCapture.classification,
         history
       );
+    } else if (isMorningBrief(userMessage)) {
+      console.log(`[${ts()}] routing to morning brief`);
+      agentReply = await generateMorningBrief();
     } else if (isCaptureIntent(userMessage)) {
       // Only route to capture if message contains explicit trigger keywords
       console.log(`[${ts()}] routing to capture pipeline`);

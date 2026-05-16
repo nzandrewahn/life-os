@@ -43,11 +43,10 @@ async function generateMessage(prompt: string): Promise<string> {
   return block.text;
 }
 
-async function runMorningBrief(telegram: Telegram): Promise<void> {
-  console.log('[cron] morning brief starting');
+export async function generateMorningBrief(): Promise<string> {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: AUCKLAND });
 
-  const brief = await runAgentLoop(
+  return runAgentLoop(
     `generate morning brief for ${today}.
 
 CRITICAL: Before generating the morning brief, you MUST call read_notion_tasks to get the actual current tasks. Never generate or assume tasks from context. If read_notion_tasks returns empty, say "no tasks found" in the today section. Never hallucinate tasks.
@@ -91,7 +90,11 @@ field rules:
 - max 5 tasks total in today section`,
     [],
   );
+}
 
+async function runMorningBrief(telegram: Telegram): Promise<void> {
+  console.log('[cron] morning brief starting');
+  const brief = await generateMorningBrief();
   await telegram.sendMessage(getChatId(), brief);
   console.log('[cron] morning brief sent');
 }

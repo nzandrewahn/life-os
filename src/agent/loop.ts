@@ -8,10 +8,19 @@ import type { DbMessage } from '../types';
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MAX_ITERATIONS = 10;
 
-// Andrew Task Board data source — use env var with fallback to known ID
-const TASKS_DB_ID = process.env.NOTION_TASKS_DB_ID ?? '275237a5-f577-80fa-b074-000b071090b7';
+const NOTION_CONTEXT = `
 
-const NOTION_CONTEXT = `\n\n## notion task board\n\nALL tasks — including for Lost Marbles, Abstracted Objects, Blender, and Sketching projects — go to the Andrew Task Board ONLY. Never search for or create tasks in any other Notion database.\n\ndata source id: ${TASKS_DB_ID}\nto read tasks: notion-fetch with id "collection://${TASKS_DB_ID}". to create tasks: notion-create-pages with parent { type: "data_source_id", data_source_id: "${TASKS_DB_ID}" }. to update task status: notion-update-page with command "update_properties".\nproperties: Name (title), Status (Not started/In progress/Paused/Done), Priority (Critical/High/Normal/Low), Energy (Low/Medium/High), Project (Lost Marbles/Abstracted Objects/Blender/Sketching/Personal/Other), Time Estimate (number hours), Why (text), Date (date YYYY-MM-DD).\nwhen a project is mentioned (e.g. "Lost Marbles", "Blender") — set the Project field to that value on the task, do not route to any other database.\nwhen reading tasks: filter out Status=Done and parent tasks that have sub-items. sort by priority (Critical first) then energy (High last).`;
+## notion tools
+
+- read_notion_tasks: reads all active tasks from Andrew's task board. returns name, priority, project, time estimate, energy, why. call this whenever asked about tasks or generating a morning brief. never generate tasks from context.
+- write_notion_task: creates a new task in the task board
+- update_notion_task_status: marks a task done / in progress / paused
+- read_training_today: returns today's training session from the 16-week plan
+- read_sketching_today: returns the next incomplete sketching session
+- mark_training_done: marks today's training as complete (pass to_do_block_id)
+- mark_sketching_done: marks current sketching session complete (pass page_id)
+
+all tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, Personal — go to the Andrew Task Board only. never invent tasks from context.`;
 
 const allTools: Anthropic.Tool[] = [...TOOLS];
 
