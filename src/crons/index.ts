@@ -67,6 +67,7 @@ good morning.
 [Xhr, energy] task name (project)
 
 — training —
+[name from read_training_today, lowercase, e.g. "week 1 — day 2"]
 [session text from read_training_today, or omit this section entirely if the tool errored]
 
 — sketching —

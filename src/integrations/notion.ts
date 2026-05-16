@@ -6,7 +6,6 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 console.log('[notion] client methods:', typeof notion.databases?.query);
 
-const TRAINING_PAGE_ID = process.env.NOTION_TRAINING_PAGE_ID ?? '';
 
 const WARMUP = 'warm-up: rows of straight lines (horizontal, vertical, 45°, diagonal) then ellipses at different angles. 5 min.';
 
@@ -258,73 +257,40 @@ export async function markSketchingDone(pageId: string): Promise<void> {
 
 // ─── Training ─────────────────────────────────────────────────────────────────
 
-export async function readTrainingToday(): Promise<string> {
-  const today = new Intl.DateTimeFormat('en-NZ', {
-    weekday: 'long',
-    timeZone: 'Pacific/Auckland',
-  }).format(new Date());
-
-  console.log('[training] today is:', today);
-
-  if (today === 'Friday' || today === 'Sunday') return 'rest day';
-
-  const topLevel = await notion.blocks.children.list({
-    block_id: process.env.NOTION_TRAINING_PAGE_ID!,
-  });
-
-  console.log('[training] top level blocks:', topLevel.results.length);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const toDos: { text: string; checked: boolean }[] = [];
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const block of topLevel.results as any[]) {
-    if (block.type !== 'column_list') continue;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cols = await notion.blocks.children.list({ block_id: block.id });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const col of cols.results as any[]) {
-      if (col.type !== 'column') continue;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const items = await notion.blocks.children.list({ block_id: col.id });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const item of items.results as any[]) {
-        if (item.type !== 'to_do') continue;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const text = (item.to_do.rich_text as any[]).map((t: any) => t.plain_text).join('');
-        toDos.push({ text, checked: item.to_do.checked });
-      }
-    }
-  }
-
-  console.log('[training] to_do blocks found:', toDos.length);
-  console.log('[training] checked count:', toDos.filter(t => t.checked).length);
-
-  if (toDos.length === 0) return 'no sessions found — check notion connection';
-
-  const lastCheckedIndex = toDos.map(t => t.checked).lastIndexOf(true);
-  const weekIndex = lastCheckedIndex === -1 ? 0 : Math.floor(lastCheckedIndex / 7);
-
-  console.log('[training] current week index:', weekIndex);
-
-  const weekStart = weekIndex * 7;
-  const weekTodos = toDos.slice(weekStart, weekStart + 7);
-
-  console.log('[training] week todos:', weekTodos.map(t => t.text.substring(0, 50)));
-
-  const todaySession = weekTodos.find(t => t.text.toLowerCase().includes(today.toLowerCase()));
-
-  if (!todaySession) return 'rest day';
-
-  return todaySession.text
-    .replace(/\*\*/g, '')
-    .replace(new RegExp(`^${today}:\\s*`, 'i'), '')
-    .trim();
+export interface TrainingSession {
+  session: string;
+  pageId: string;
+  name: string;
 }
 
-export async function markTrainingDone(blockId: string): Promise<void> {
-  await notion.blocks.update({
-    block_id: blockId,
-    to_do: { checked: true },
-  } as never);
+export async function readTrainingToday(): Promise<TrainingSession | { session: string; pageId: null; name: null }> {
+  const response = await notion.databases.query({
+    database_id: process.env.NOTION_TRAINING_DB_ID!,
+    filter: { property: 'Done', checkbox: { equals: false } },
+    sorts: [{ property: 'Day', direction: 'ascending' }],
+    page_size: 1,
+  });
+
+  const page = response.results[0] as Record<string, unknown> | undefined;
+  if (!page) return { session: 'all sessions complete', pageId: null, name: null };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const props = (page as any).properties;
+  const sessionText: string = props?.Session?.rich_text?.[0]?.plain_text ?? '';
+  const name: string = props?.['Session Name']?.title?.[0]?.plain_text ?? '';
+
+  console.log('[training] next session:', name, sessionText);
+
+  return {
+    session: sessionText || 'rest day',
+    pageId: page.id as string,
+    name,
+  };
+}
+
+export async function markTrainingDone(pageId: string): Promise<void> {
+  await notion.pages.update({
+    page_id: pageId,
+    properties: { Done: { checkbox: true } } as never,
+  });
 }

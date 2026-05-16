@@ -17,7 +17,7 @@ const NOTION_CONTEXT = `
 - update_notion_task_status: updates any task fields — status, priority, energy, time estimate, and/or project. pass only the fields you want to change.
 - read_training_today: returns today's training session from the 16-week plan
 - read_sketching_today: returns the next incomplete sketching session
-- mark_training_done: marks today's training as complete (pass to_do_block_id)
+- mark_training_done: marks today's training as complete (pass page_id from read_training_today)
 - mark_sketching_done: marks current sketching session complete (pass page_id)
 
 all tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, Personal — go to the Andrew Task Board only. never invent tasks from context.`;
@@ -27,7 +27,7 @@ const allTools: Anthropic.Tool[] = [...TOOLS];
 export function initAgentTools(): void {
   console.log('[agent] NOTION_API_KEY set:', !!process.env.NOTION_API_KEY);
   console.log('[agent] NOTION_TASKS_DB_ID:', process.env.NOTION_TASKS_DB_ID ?? '(using default)');
-  console.log('[agent] NOTION_TRAINING_PAGE_ID:', process.env.NOTION_TRAINING_PAGE_ID ?? '(not set)');
+  console.log('[agent] NOTION_TRAINING_DB_ID:', process.env.NOTION_TRAINING_DB_ID ?? '(not set)');
   console.log('[agent] NOTION_SKETCHING_DB_ID:', process.env.NOTION_SKETCHING_DB_ID ?? '(not set)');
   console.log(`[agent] ${allTools.length} tools registered`);
   console.log('[agent] update tool fields:', JSON.stringify(allTools.find(t => t.name === 'update_notion_task_status')));

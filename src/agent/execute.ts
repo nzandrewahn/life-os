@@ -266,11 +266,16 @@ async function transcribeAudio(input: ToolInput) {
 
 async function execReadTrainingToday() {
   console.log('[tool] read_training_today called');
-  return readTrainingToday();
+  const result = await readTrainingToday();
+  return {
+    session: result.session,
+    name: result.name,
+    page_id: result.pageId,
+  };
 }
 
 async function execMarkTrainingDone(input: ToolInput) {
-  await markTrainingDone(input.block_id as string);
+  await markTrainingDone(input.page_id as string);
   return { success: true, message: 'training session marked done' };
 }
 

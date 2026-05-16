@@ -83,7 +83,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'read_training_today',
     description:
-      'Read today\'s scheduled training session from the 16-week half marathon plan. Fetches the Notion training page blocks, finds the last completed to_do to determine the current week, then returns the session for today\'s day of the week. Returns rest_day: true on Fridays or if no session is scheduled. Returns to_do_block_id — when Andrew says he completed training, call mark_training_done with that block ID. Include in morning brief under — training —.',
+      'Read the next incomplete training session from the 16-week plan database. Returns session text, session name (e.g. "Week 1 — Day 2"), and page_id. When Andrew says he completed training, call mark_training_done with that page_id. Include in morning brief under — training —.',
     input_schema: {
       type: 'object' as const,
       properties: {},
@@ -93,13 +93,13 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'mark_training_done',
     description:
-      'Mark today\'s training session as completed. Call this when Andrew says he finished his training. Pass the to_do_block_id returned by read_training_today.',
+      'Mark a training session as completed. Call this when Andrew says he finished his training. Pass the page_id returned by read_training_today.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        block_id: { type: 'string', description: 'The to_do block ID from read_training_today.' },
+        page_id: { type: 'string', description: 'The page ID from read_training_today.' },
       },
-      required: ['block_id'],
+      required: ['page_id'],
     },
   },
   {
