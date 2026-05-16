@@ -2,6 +2,26 @@ import type Anthropic from '@anthropic-ai/sdk';
 
 export const TOOLS: Anthropic.Tool[] = [
   {
+    name: 'read_training_today',
+    description:
+      'Read today\'s scheduled training session from the 16-week half marathon plan. Fetches the Notion training page, finds the last completed checkbox to determine the current week, then returns the session for today\'s day of the week. Returns rest_day: true on Fridays or if the plan has no session scheduled. Also returns the exact page ID and checkbox line needed to mark it done — when Andrew says he completed training, call notion-update-page with command "update_content" to replace the `[ ]` with `[x]` in the full_checkbox_line. Include in morning brief under — training —.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'read_sketching_today',
+    description:
+      'Read the next incomplete sketching session from the Sketching Programme database (ordered by Day Number). Returns the session title, which week it belongs to, and the page ID. Always prepends the 5-min warm-up note. Include in morning brief under — sketching —. When Andrew says he completed his sketching session, call notion-update-page with command "update_properties" and properties: { Done: "__YES__" } on the returned page_id.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
     name: 'read_supabase_history',
     description:
       'Read recent conversation and energy logs from Supabase. Returns messages from the last N days. Use this during morning briefs to understand recent context — what was deferred, what energy levels have been, what is in progress.',

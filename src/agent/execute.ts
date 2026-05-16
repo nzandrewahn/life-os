@@ -32,6 +32,8 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
     case 'create_calendar_event':    return execCreateCalendarEvent(input);
     case 'update_calendar_event':    return execUpdateCalendarEvent(input);
     case 'delete_calendar_event':    return execDeleteCalendarEvent(input);
+    case 'read_training_today':      return execReadTrainingToday();
+    case 'read_sketching_today':     return execReadSketchingToday();
     case 'update_context':           return execUpdateContext(input);
     case 'fetch_url':                return fetchUrl(input);
     case 'transcribe_audio':         return transcribeAudio(input);
@@ -204,4 +206,157 @@ async function transcribeAudio(input: ToolInput) {
     duration_seconds: 0,
     note: 'Would transcribe via OpenAI Whisper in Phase 4',
   };
+}
+
+// ─── Training & Sketching ──────────────────────────────────────────────────
+
+interface TrainingDay {
+  checked: boolean;
+  day: string;
+  session: string;
+  rawLine: string;
+}
+
+interface TrainingWeek {
+  weekNum: number;
+  days: TrainingDay[];
+}
+
+function parseTrainingWeeks(content: string): TrainingWeek[] {
+  const weeks: TrainingWeek[] = [];
+  const columnRegex = /<column>([\s\S]*?)<\/column>/g;
+  let colMatch;
+
+  while ((colMatch = columnRegex.exec(content)) !== null) {
+    const col = colMatch[1];
+    const weekMatch = col.match(/\*\*Week (\d+)/);
+    if (!weekMatch) continue;
+    const weekNum = parseInt(weekMatch[1], 10);
+
+    // Match lines like: [optional tabs]- [ ] **DayName:** session text
+    const cbRegex = /^([ \t]*- \[([ x])\] \*\*(\w+):\*\* .+)$/gm;
+    const days: TrainingDay[] = [];
+    let cb;
+
+    while ((cb = cbRegex.exec(col)) !== null) {
+      const rawLine = cb[1];
+      const checked = cb[2] === 'x';
+      const day = cb[3];
+      // session is everything after "**DayName:** "
+      const sessionMatch = rawLine.match(/\*\*\w+:\*\* (.+)$/);
+      const session = sessionMatch ? sessionMatch[1].trim() : '';
+      days.push({ checked, day, session, rawLine });
+    }
+
+    if (days.length > 0) weeks.push({ weekNum, days });
+  }
+
+  return weeks.sort((a, b) => a.weekNum - b.weekNum);
+}
+
+function extractPageProperties(content: string): Record<string, unknown> | null {
+  const match = content.match(/<properties>\n([\s\S]*?)\n<\/properties>/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+async function execReadTrainingToday() {
+  const pageId = process.env.NOTION_TRAINING_PAGE_ID;
+  if (!pageId) throw new Error('NOTION_TRAINING_PAGE_ID is not set');
+
+  const raw = await callNotionTool('notion-fetch', { id: pageId });
+  const weeks = parseTrainingWeeks(raw);
+
+  const today = new Date().toLocaleDateString('en-NZ', {
+    weekday: 'long',
+    timeZone: 'Pacific/Auckland',
+  });
+
+  if (today === 'Friday') {
+    return { rest_day: true, day: 'Friday', session: 'rest day' };
+  }
+
+  // Determine current week from last checked session
+  let currentWeekNum = 1;
+  for (const week of weeks) {
+    for (const day of week.days) {
+      if (day.checked) currentWeekNum = week.weekNum;
+    }
+  }
+
+  const currentWeek = weeks.find(w => w.weekNum === currentWeekNum);
+  if (!currentWeek) {
+    return { error: `week ${currentWeekNum} not found in training plan` };
+  }
+
+  const todayEntry = currentWeek.days.find(d => d.day.toLowerCase() === today.toLowerCase());
+
+  if (!todayEntry || /^rest$/i.test(todayEntry.session)) {
+    return { rest_day: true, day: today, week: currentWeekNum, session: 'rest day' };
+  }
+
+  return {
+    rest_day: todayEntry.checked,
+    already_done: todayEntry.checked,
+    week: currentWeekNum,
+    day: today,
+    session: todayEntry.session,
+    full_checkbox_line: todayEntry.rawLine,
+    training_page_id: pageId,
+    mark_done_instruction: `call notion-update-page with page_id "${pageId}", command "update_content", content_updates: [{ old_str: "${todayEntry.rawLine}", new_str: "${todayEntry.rawLine.replace('- [ ]', '- [x]')}" }]`,
+  };
+}
+
+async function execReadSketchingToday() {
+  const dbId = process.env.NOTION_SKETCHING_DB_ID;
+  if (!dbId) throw new Error('NOTION_SKETCHING_DB_ID is not set');
+
+  const WARMUP = 'warm-up: rows of straight lines (horizontal, vertical, 45°, diagonal) then ellipses at different angles. 5 min.';
+  const dataSourceUrl = `collection://${dbId}`;
+
+  // Search for all sessions — they're all titled "Day N — ..."
+  const searchRaw = await callNotionTool('notion-search', {
+    query: 'Day',
+    data_source_url: dataSourceUrl,
+    page_size: 25,
+    max_highlight_length: 0,
+  });
+
+  let results: Array<{ id: string; title: string }> = [];
+  try {
+    const parsed = JSON.parse(searchRaw) as { results: Array<{ id: string; title: string }> };
+    results = parsed.results ?? [];
+  } catch {
+    throw new Error(`could not parse sketching database search results: ${searchRaw.slice(0, 200)}`);
+  }
+
+  // Sort sessions by day number extracted from title ("Day N — ...")
+  const sessions = results
+    .map(r => {
+      const m = r.title.match(/^Day (\d+)/i);
+      return m ? { id: r.id, title: r.title, dayNum: parseInt(m[1], 10) } : null;
+    })
+    .filter((s): s is { id: string; title: string; dayNum: number } => s !== null)
+    .sort((a, b) => a.dayNum - b.dayNum);
+
+  // Fetch each in order until we find one that isn't done
+  for (const session of sessions) {
+    const pageRaw = await callNotionTool('notion-fetch', { id: session.id });
+    const props = extractPageProperties(pageRaw);
+    if (!props || props['Done'] === '__YES__') continue;
+
+    return {
+      day_number: session.dayNum,
+      title: session.title,
+      week: props['Week'] ?? null,
+      page_id: session.id,
+      session: `${WARMUP}\n\n${session.title}`,
+    };
+  }
+
+  return { completed: true, message: 'all sketching sessions completed — programme finished!' };
 }

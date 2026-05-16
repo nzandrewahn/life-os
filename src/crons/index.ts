@@ -48,7 +48,7 @@ async function runMorningBrief(telegram: Telegram): Promise<void> {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: AUCKLAND });
 
   const brief = await runAgentLoop(
-    `generate morning brief for ${today}. read notion tasks (fetch the andrew task board, filter out done tasks and parent tasks with sub-items, sort by priority then energy). read google calendar for today. read pending life tasks from supabase. format exactly as:\n\ngood morning.\n\n— today —\n[task lines: Xh task name (project)]\n\n— calendar —\n[event lines: time title]\n${''}\nXh of tasks open\n\nreply with energy (1–10) and hours available.\n\nall lowercase, no asterisks, no markdown, no commentary.`,
+    `generate morning brief for ${today}. call read_training_today and read_sketching_today. read notion tasks (fetch the andrew task board, filter out done tasks and parent tasks with sub-items, sort by priority then energy). read google calendar for today. read pending life tasks from supabase. format exactly as:\n\ngood morning.\n\n— today —\n[task lines: Xh task name (project)]\n\n— calendar —\n[event lines: time title]\n\n— training —\n[session description, or "rest day"]\n\n— sketching —\n[warm-up note then session title]\n\nXh of tasks open\n\nreply with energy (1–10) and hours available.\n\nall lowercase, no asterisks, no markdown, no commentary.`,
     [],
   );
 
