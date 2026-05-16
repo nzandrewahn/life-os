@@ -80,12 +80,14 @@ async function execUpdateNotionTask(input: ToolInput) {
   console.log('[update] energy:', input.energy);
   console.log('[update] time_estimate:', input.time_estimate);
   console.log('[update] project:', input.project);
+  console.log('[update] why:', input.why);
   await updateNotionTask(input.page_id as string, {
     status:       input.status        as string | undefined,
     priority:     input.priority      as string | undefined,
     energy:       input.energy        as string | undefined,
     timeEstimate: input.time_estimate as number | undefined,
     project:      input.project       as string | undefined,
+    why:          input.why           as string | undefined,
   });
   const updated = ['status', 'priority', 'energy', 'time_estimate', 'project']
     .filter(k => input[k] != null)

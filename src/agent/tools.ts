@@ -72,6 +72,10 @@ export const TOOLS: Anthropic.Tool[] = [
           enum: ['Lost Marbles', 'Abstracted Objects', 'Blender', 'Sketching', 'Personal', 'Other'],
           description: 'New project assignment.',
         },
+        why: {
+          type: 'string',
+          description: 'Updated why/rationale for the task.',
+        },
       },
       required: ['page_id'],
     },

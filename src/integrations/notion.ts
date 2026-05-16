@@ -177,6 +177,7 @@ export async function updateNotionTask(
     energy?: string;
     timeEstimate?: number;
     project?: string;
+    why?: string;
   },
 ): Promise<void> {
   console.log('[notion] updateNotionTask pageId:', pageId);
@@ -184,13 +185,15 @@ export async function updateNotionTask(
   console.log('[notion] energy provided:', fields.energy);
   console.log('[notion] timeEstimate provided:', fields.timeEstimate);
   console.log('[notion] project provided:', fields.project);
+  console.log('[notion] why provided:', fields.why);
 
   const properties: Record<string, unknown> = {};
-  if (fields.status)       properties['Status']        = { status: { name: fields.status } };
-  if (fields.priority)     properties['Priority']      = { select: { name: fields.priority } };
-  if (fields.energy)       properties['Energy']        = { select: { name: fields.energy } };
-  if (fields.project)      properties['Project']       = { select: { name: fields.project } };
-  if (fields.timeEstimate != null) properties['Time Estimate'] = { number: fields.timeEstimate };
+  if (fields.status)                properties['Status']        = { status: { name: fields.status } };
+  if (fields.priority)              properties['Priority']      = { select: { name: fields.priority } };
+  if (fields.energy)                properties['Energy']        = { select: { name: fields.energy } };
+  if (fields.project)               properties['Project']       = { select: { name: fields.project } };
+  if (fields.timeEstimate != null)  properties['Time Estimate'] = { number: fields.timeEstimate };
+  if (fields.why)                   properties['Why']           = { rich_text: [{ text: { content: fields.why } }] };
 
   console.log('[notion] updateNotionTask props:', JSON.stringify(properties, null, 2));
 
