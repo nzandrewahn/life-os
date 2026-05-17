@@ -87,6 +87,7 @@ async function execWriteNotionTask(input: ToolInput) {
 async function execUpdateNotionTask(input: ToolInput) {
   console.log('[update] raw input:', JSON.stringify(input));
   console.log('[update] page_id:', input.page_id);
+  console.log('[update] name:', input.name);
   console.log('[update] status:', input.status);
   console.log('[update] priority:', input.priority);
   console.log('[update] energy:', input.energy);
@@ -94,6 +95,7 @@ async function execUpdateNotionTask(input: ToolInput) {
   console.log('[update] project:', input.project);
   console.log('[update] why:', input.why);
   await updateNotionTask(input.page_id as string, {
+    name:         input.name          as string | undefined,
     status:       input.status        as string | undefined,
     priority:     input.priority      as string | undefined,
     energy:       input.energy        as string | undefined,
@@ -101,7 +103,7 @@ async function execUpdateNotionTask(input: ToolInput) {
     project:      input.project       as string | undefined,
     why:          input.why           as string | undefined,
   });
-  const updated = ['status', 'priority', 'energy', 'time_estimate', 'project']
+  const updated = ['name', 'status', 'priority', 'energy', 'time_estimate', 'project']
     .filter(k => input[k] != null)
     .map(k => `${k}: ${input[k]}`)
     .join(', ');

@@ -76,6 +76,10 @@ export const TOOLS: Anthropic.Tool[] = [
           type: 'string',
           description: 'Updated why/rationale for the task.',
         },
+        name: {
+          type: 'string',
+          description: 'New task name — use to fix casing or rename the task.',
+        },
       },
       required: ['page_id'],
     },

@@ -175,6 +175,7 @@ export async function writeNotionTask(
 export async function updateNotionTask(
   pageId: string,
   fields: {
+    name?: string;
     status?: string;
     priority?: string;
     energy?: string;
@@ -184,6 +185,7 @@ export async function updateNotionTask(
   },
 ): Promise<void> {
   console.log('[notion] updateNotionTask pageId:', pageId);
+  console.log('[notion] name provided:', fields.name);
   console.log('[notion] priority provided:', fields.priority);
   console.log('[notion] energy provided:', fields.energy);
   console.log('[notion] timeEstimate provided:', fields.timeEstimate);
@@ -191,6 +193,7 @@ export async function updateNotionTask(
   console.log('[notion] why provided:', fields.why);
 
   const properties: Record<string, unknown> = {};
+  if (fields.name)                  properties['Name']          = { title: [{ text: { content: fields.name } }] };
   if (fields.status)                properties['Status']        = { status: { name: fields.status } };
   if (fields.priority)              properties['Priority']      = { select: { name: fields.priority } };
   if (fields.energy)                properties['Energy']        = { select: { name: fields.energy } };
