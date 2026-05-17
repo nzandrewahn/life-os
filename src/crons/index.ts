@@ -243,18 +243,18 @@ export function startCrons(telegram: Telegram): void {
   // Morning brief — 7:00am daily
   schedule('0 7 * * *', 'morning brief', () => runMorningBrief(telegram));
 
-  // Evening check-in — 1:00am Mon–Thu (late night after work day)
-  schedule('0 1 * * 1-4', 'evening check-in (weekday)', () => runEveningCheckIn(telegram));
+  // Evening check-in — 1:00am Tue–Fri (after Mon–Thu work shifts ending at 12:30am)
+  schedule('0 1 * * 2-5', 'evening check-in (post-work)', () => runEveningCheckIn(telegram));
 
-  // Evening check-in — 9:00pm Fri–Sun
-  schedule('0 21 * * 5,6,0', 'evening check-in (weekend)', () => runEveningCheckIn(telegram));
+  // Evening check-in — 10:00pm Sun–Mon (rest nights before days off)
+  schedule('0 22 * * 0,1', 'evening check-in (rest day)', () => runEveningCheckIn(telegram));
 
   // Weekly digest — 6:00pm Sunday
   schedule('0 18 * * 0', 'weekly digest', () => runWeeklyDigest(telegram));
 
   console.log('[cron] 4 jobs registered (Pacific/Auckland)');
-  console.log('[cron]   morning brief:      0 7 * * *');
-  console.log('[cron]   evening (weekday):  0 1 * * 1-4');
-  console.log('[cron]   evening (weekend):  0 21 * * 5,6,0');
-  console.log('[cron]   weekly digest:      0 18 * * 0');
+  console.log('[cron]   morning brief:        0 7 * * *');
+  console.log('[cron]   evening (post-work):  0 1 * * 2-5');
+  console.log('[cron]   evening (rest day):   0 22 * * 0,1');
+  console.log('[cron]   weekly digest:        0 18 * * 0');
 }
