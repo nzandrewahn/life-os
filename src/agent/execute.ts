@@ -20,6 +20,11 @@ import {
   updateCalendarEvent,
   deleteCalendarEvent,
 } from '../integrations/google-calendar';
+import {
+  readLifeTasks,
+  writeLifeTask,
+  completeLifeTask,
+} from '../integrations/google-tasks';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
@@ -46,6 +51,9 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
     case 'mark_training_done':       return execMarkTrainingDone(input);
     case 'read_sketching_today':     return execReadSketchingToday();
     case 'mark_sketching_done':      return execMarkSketchingDone(input);
+    case 'read_life_tasks':          return readLifeTasks();
+    case 'write_life_task':          return execWriteLifeTask(input);
+    case 'complete_life_task':       return execCompleteLifeTask(input);
     case 'update_context':           return execUpdateContext(input);
     case 'fetch_url':                return fetchUrl(input);
     case 'transcribe_audio':         return transcribeAudio(input);
@@ -288,4 +296,20 @@ async function execReadSketchingToday() {
 async function execMarkSketchingDone(input: ToolInput) {
   await markSketchingDone(input.page_id as string);
   return { success: true, message: 'sketching session marked done' };
+}
+
+// ─── Google Tasks ──────────────────────────────────────────────────────────
+
+async function execWriteLifeTask(input: ToolInput) {
+  const id = await writeLifeTask(
+    input.title as string,
+    input.notes as string | undefined,
+    input.due as string | undefined,
+  );
+  return { success: true, id, message: `life task added: ${input.title}` };
+}
+
+async function execCompleteLifeTask(input: ToolInput) {
+  await completeLifeTask(input.task_id as string);
+  return { success: true, message: 'life task completed' };
 }

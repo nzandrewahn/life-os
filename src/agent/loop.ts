@@ -20,7 +20,13 @@ const NOTION_CONTEXT = `
 - mark_training_done: marks today's training as complete (pass page_id from read_training_today)
 - mark_sketching_done: marks current sketching session complete (pass page_id)
 
-all tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, Personal — go to the Andrew Task Board only. never invent tasks from context.`;
+all tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, Personal — go to the Andrew Task Board only. never invent tasks from context.
+
+## life task tools
+
+- read_life_tasks: reads Andrew's personal todos from Google Tasks (groceries, errands, personal)
+- write_life_task: adds a personal todo to Google Tasks
+- complete_life_task: marks a personal todo as done (pass task_id from read_life_tasks)`;
 
 const webSearchTool = {
   type: 'web_search_20250305',

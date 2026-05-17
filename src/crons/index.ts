@@ -58,7 +58,7 @@ steps — call ALL of these tools before writing anything:
 2. call read_training_today — get today's session
 3. call read_sketching_today — get today's sketching session
 4. call read_google_calendar with days=1 — get today's events
-5. call read_supabase_history with days=1 — check for pending life tasks
+5. call read_life_tasks — get personal todos from Google Tasks
 
 format exactly as shown below. all lowercase. no asterisks. no markdown symbols. no commentary.
 
@@ -80,7 +80,7 @@ warm-up: straight lines then ellipses, 5 min
 [time] event name
 
 — life —
-[pending life tasks if any — omit this section entirely if none]
+[pending life tasks from read_life_tasks if any — omit this section entirely if none]
 
 what's your energy (1–10) and hours free today?
 

@@ -17,7 +17,7 @@ import type { Classification } from './capture/classify';
 const ALLOWED_CHAT_ID = process.env.TELEGRAM_CHAT_ID!;
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-type Intent = 'capture' | 'task_update' | 'brief_reply' | 'conversation';
+type Intent = 'capture' | 'task_update' | 'life_task' | 'brief_reply' | 'conversation';
 
 async function classifyIntent(userMessage: string, wasBrief: boolean): Promise<Intent> {
   const response = await anthropic.messages.create({
@@ -29,7 +29,9 @@ async function classifyIntent(userMessage: string, wasBrief: boolean): Promise<I
 
 capture — user is saving a thought, idea, insight, learning, reference or note for their second brain. Usually starts with "capture", "note", "save", "insight", "learned" but not always. Must be something worth keeping.
 
-task_update — user wants to update a task's status, priority, energy, project or time estimate in their task board.
+task_update — user wants to update a work task's status, priority, energy, project or time estimate in their Notion task board.
+
+life_task — user wants to add, complete, or check personal todos: groceries, errands, appointments, reminders, or anything not related to a work project.
 
 brief_reply — user is replying to their morning brief with their energy level and hours available for the day.
 ${wasBrief ? 'IMPORTANT: the last message WAS a morning brief, so this is likely a brief_reply if it contains a number.' : 'The last message was NOT a morning brief.'}
@@ -38,13 +40,14 @@ conversation — anything else: questions, requests for info, commands, general 
 
 Message: "${userMessage}"
 
-Reply with only one word: capture, task_update, brief_reply, or conversation.`,
+Reply with only one word: capture, task_update, life_task, brief_reply, or conversation.`,
     }],
   });
 
   const text = response.content.find(b => b.type === 'text')?.text.trim().toLowerCase() ?? '';
   if (text === 'capture') return 'capture';
   if (text === 'task_update') return 'task_update';
+  if (text === 'life_task') return 'life_task';
   if (text === 'brief_reply') return 'brief_reply';
   return 'conversation';
 }
@@ -148,6 +151,9 @@ async function handleIncoming(
         agentReply = result.message;
       } else if (intent === 'task_update') {
         console.log(`[${ts()}] routing to agent loop (task update)`);
+        agentReply = await runAgentLoop(userMessage, history);
+      } else if (intent === 'life_task') {
+        console.log(`[${ts()}] routing to agent loop (life task)`);
         agentReply = await runAgentLoop(userMessage, history);
       } else if (intent === 'brief_reply') {
         const energyMatch = userMessage.match(/\b([1-9]|10)\b/);

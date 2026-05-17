@@ -172,6 +172,39 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'read_life_tasks',
+    description: "Read Andrew's personal life tasks (groceries, errands, personal todos) from Google Tasks. Use during morning briefs and when Andrew asks about his personal todo list.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'write_life_task',
+    description: 'Add a new personal life task to Google Tasks. Use for groceries, errands, personal appointments, and non-project todos.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Task title.' },
+        notes: { type: 'string', description: 'Optional notes.' },
+        due: { type: 'string', description: 'Optional due date as RFC 3339 timestamp (e.g. 2026-05-20T09:00:00+12:00).' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'complete_life_task',
+    description: 'Mark a personal life task as completed in Google Tasks. Get the task_id from read_life_tasks.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        task_id: { type: 'string', description: 'Google Tasks task ID from read_life_tasks.' },
+      },
+      required: ['task_id'],
+    },
+  },
+  {
     name: 'write_supabase_life_task',
     description:
       'Create a life task in Supabase. Use for personal, logistical, non-project tasks — errands, admin, health, groceries, personal appointments. Always call create_reminder immediately after this tool — these two are always called together. Do NOT use for project tasks; those go to write_notion_task.',
