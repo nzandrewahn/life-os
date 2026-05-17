@@ -22,7 +22,12 @@ const NOTION_CONTEXT = `
 
 all tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, Personal — go to the Andrew Task Board only. never invent tasks from context.`;
 
-const allTools: Anthropic.Tool[] = [...TOOLS];
+const webSearchTool = {
+  type: 'web_search_20250305',
+  name: 'web_search',
+} as unknown as Anthropic.Tool;
+
+const allTools: Anthropic.Tool[] = [...TOOLS, webSearchTool];
 
 export function initAgentTools(): void {
   console.log('[agent] NOTION_API_KEY set:', !!process.env.NOTION_API_KEY);
