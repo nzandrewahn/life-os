@@ -14,7 +14,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'write_notion_task',
     description:
-      'Create a new task in the Andrew Task Board in Notion. Use for ALL project tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, and any other project work. Do NOT use write_supabase_life_task for project tasks.',
+      'Create a new task in the Andrew Task Board in Notion and returns its page_id for immediate use in follow-up updates. Use for ALL project tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, and any other project work. Do NOT use write_supabase_life_task for project tasks.',
     input_schema: {
       type: 'object' as const,
       properties: {

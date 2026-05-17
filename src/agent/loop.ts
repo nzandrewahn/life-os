@@ -13,7 +13,7 @@ const NOTION_CONTEXT = `
 ## notion tools
 
 - read_notion_tasks: reads all active tasks from Andrew's task board. returns name, priority, project, time estimate, energy, why. call this whenever asked about tasks or generating a morning brief. never generate tasks from context.
-- write_notion_task: creates a new task in the task board
+- write_notion_task: creates a new task and returns its page_id — use it directly for any immediate follow-up updates without calling read_notion_tasks again.
 - update_notion_task_status: updates any task fields — status, priority, energy, time estimate, and/or project. pass only the fields you want to change.
 - read_training_today: returns today's training session from the 16-week plan
 - read_sketching_today: returns the next incomplete sketching session

@@ -165,6 +165,10 @@ export async function writeNotionTask(
     properties: properties as never,
   });
 
+  console.log('[notion] created page id:', page.id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  console.log('[notion] created page status:', (page as any).properties?.Status);
+
   return { id: page.id, title, project: finalProject, priority: finalPriority, timeEstimate: finalTimeEstimate, energy: finalEnergy };
 }
 
