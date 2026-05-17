@@ -8,18 +8,15 @@ export interface LifeTask {
 }
 
 function getAuth() {
-  const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!json) throw new Error('[google-tasks] GOOGLE_SERVICE_ACCOUNT_JSON is not set');
-  let credentials: Record<string, unknown>;
-  try {
-    credentials = JSON.parse(json);
-  } catch {
-    throw new Error('[google-tasks] GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON');
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_TASKS_REFRESH_TOKEN;
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('[google-tasks] GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, or GOOGLE_TASKS_REFRESH_TOKEN is not set');
   }
-  return new google.auth.GoogleAuth({
-    credentials,
-    scopes: ['https://www.googleapis.com/auth/tasks'],
-  });
+  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, 'http://localhost');
+  oauth2.setCredentials({ refresh_token: refreshToken });
+  return oauth2;
 }
 
 function getClient() {
