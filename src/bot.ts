@@ -38,6 +38,20 @@ ${wasBrief ? 'IMPORTANT: the last message WAS a morning brief, so this is likely
 
 conversation — anything else: questions, requests for info, commands, general chat, asking what Caterina can do, etc.
 
+IMPORTANT: if the message appears to be a reply to something Caterina just said — agreeing, disagreeing, giving feedback, confirming, or refining a plan — classify it as conversation, NOT capture.
+
+Captures are only when Andrew is explicitly saving something for his second brain, not when he's responding to Caterina in a back-and-forth.
+
+Signs it's a conversation reply:
+- references to 'existing', 'proposed', numbered items
+- words like 'combine', 'separate', 'merge', 'keep'
+- agreeing or disagreeing with a previous message
+- giving instructions to Caterina about what to do
+
+Signs it's a capture:
+- explicitly starts with capture/note/save/insight
+- standalone thought with no reference to prior context
+
 Message: "${userMessage}"
 
 Reply with only one word: capture, task_update, life_task, brief_reply, or conversation.`,
