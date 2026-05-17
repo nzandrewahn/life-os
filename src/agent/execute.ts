@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { appendFileSync } from 'fs';
 import { join } from 'path';
-import { buildNote, readNote, writeNote, appendToNote } from '../integrations/obsidian';
+import { buildNote, readNote, writeNote, appendToNote, resolveFolder } from '../integrations/obsidian';
 import {
   readNotionTasks,
   writeNotionTask,
@@ -145,27 +145,28 @@ async function execReadObsidianIndex(input: ToolInput) {
 }
 
 async function execWriteObsidianNote(input: ToolInput) {
-  const folder = input.folder as string;
+  const type = input.type as string;
+  const title = input.title as string;
+  const content = input.content as string;
   const filename = input.filename as string;
+
+  const folder = resolveFolder(type, content);
   const path = `${folder}/${filename}.md`;
 
   const note = buildNote({
-    title: input.title as string,
-    content: input.content as string,
-    type: input.type as string,
-    project: input.project as string | undefined,
-    source: (input.source as string | undefined) ?? 'telegram-capture',
+    title,
+    content,
+    type,
     tags: input.tags as string[] | undefined,
-    related: input.related as string[] | undefined,
   });
 
   await writeNote(path, note);
 
   await insertIndex({
-    title: input.title as string,
+    title,
     path,
     folder,
-    type: input.type as string,
+    type,
     project: input.project as string | undefined,
     tags: input.tags as string[] | undefined,
   });

@@ -24,6 +24,18 @@ function sanitizeFilename(name: string): string {
     .slice(0, 80);
 }
 
+const FORBIDDEN_FOLDERS = ['2.Notes/Core', 'Archive', 'Templates'];
+const LEARNING_SIGNALS = ['i learned', 'insight', 'realised', 'realized', 'key takeaway', 'from reading', 'from watching'];
+
+export function resolveFolder(type: string, content: string): string {
+  if (FORBIDDEN_FOLDERS.some(f => type.startsWith(f))) return '1.Inbox';
+  if (type === 'daily') return '2.Notes/Daily';
+  if (type === 'learning') return '2.Notes/Learnings';
+  const lower = content.toLowerCase();
+  if (LEARNING_SIGNALS.some(s => lower.includes(s))) return '2.Notes/Learnings';
+  return '1.Inbox';
+}
+
 // Encode each path segment individually, preserve slashes
 function encodePath(path: string): string {
   return path.split('/').map(encodeURIComponent).join('/');
@@ -99,37 +111,21 @@ export interface NoteParams {
   title: string;
   content: string;
   type: string;
-  project?: string;
-  source?: string;
   tags?: string[];
-  related?: string[]; // note titles → become [[wikilinks]]
 }
 
 export function buildNote(params: NoteParams): string {
   const date = new Date().toISOString().split('T')[0];
-  const source = params.source ?? 'telegram-capture';
-  const related = (params.related ?? []).map(t => `[[${t}]]`).join(', ');
   const tags = (params.tags ?? []).join(', ');
 
   const frontmatter = [
     '---',
     `date: ${date}`,
     `type: ${params.type}`,
-    `project: ${params.project ?? ''}`,
-    `source: ${source}`,
-    `related: ${related}`,
     `tags: [${tags}]`,
+    `source: caterina`,
     '---',
   ].join('\n');
 
-  return [
-    frontmatter,
-    '',
-    `# ${params.title}`,
-    '',
-    params.content,
-    '',
-    '---',
-    `*captured via ${source}, ${date}*`,
-  ].join('\n');
+  return [frontmatter, '', params.content].join('\n');
 }

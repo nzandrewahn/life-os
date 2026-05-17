@@ -5,6 +5,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { runAgentLoop } from '../agent/loop';
+import { appendToNote, buildNote } from '../integrations/obsidian';
+import { setEveningCheckInSent } from '../state';
 
 const AUCKLAND = 'Pacific/Auckland';
 
@@ -100,8 +102,18 @@ async function runMorningBrief(telegram: Telegram): Promise<void> {
 
 async function runEveningCheckIn(telegram: Telegram): Promise<void> {
   console.log('[cron] evening check-in starting');
-  await telegram.sendMessage(getChatId(), 'what got done today? anything to carry forward?');
+  const chatId = getChatId();
+  await telegram.sendMessage(chatId, 'what got done today? anything to carry forward?');
+  setEveningCheckInSent(chatId);
   console.log('[cron] evening check-in sent');
+}
+
+export async function writeEveningLog(content: string): Promise<void> {
+  const date = new Date().toLocaleDateString('sv-SE', { timeZone: AUCKLAND });
+  const path = `2.Notes/Daily/${date}.md`;
+  const note = buildNote({ title: date, content, type: 'daily' });
+  await appendToNote(path, note);
+  console.log('[cron] evening log written to:', path);
 }
 
 async function runWeeklyDigest(telegram: Telegram): Promise<void> {

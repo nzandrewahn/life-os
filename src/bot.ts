@@ -3,8 +3,9 @@ import { message } from 'telegraf/filters';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { runAgentLoop } from './agent/loop';
-import { generateMorningBrief } from './crons';
+import { generateMorningBrief, writeEveningLog } from './crons';
 import { runDayPlan } from './agent/dayplan';
+import { lastMessageWasEveningCheckIn } from './state';
 import { logMessage, getRecentHistory } from './db';
 import { transcribeVoice } from './integrations/groq';
 import { formatForTelegram, escapeHtml } from './utils/formatter';
@@ -121,6 +122,11 @@ async function handleIncoming(
         pendingCapture.classification,
         history
       );
+    } else if (lastMessageWasEveningCheckIn.get(chatId)) {
+      lastMessageWasEveningCheckIn.set(chatId, false);
+      console.log(`[${ts()}] routing to evening log write`);
+      await writeEveningLog(userMessage);
+      agentReply = 'logged.';
     } else if (lastMessageWasBrief.get(chatId)) {
       const parsed = isEnergyReply(userMessage);
       if (parsed) {

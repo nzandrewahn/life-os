@@ -17,10 +17,10 @@ export type PipelineResult =
 const ROUTING: Record<string, string> = {
   'project-task':  'call write_notion_task',
   'life-task':     'call write_supabase_life_task then create_reminder',
-  'insight':       'call read_obsidian_index then write_obsidian_note to folder 2.Notes/Captures',
-  'idea':          'call read_obsidian_index then write_obsidian_note to folder 1.Inbox',
-  'reference':     'call fetch_url then write_notion_inspiration',
-  'learning':      'call read_obsidian_index then write_obsidian_note to folder 2.Notes/Learnings',
+  'insight':       'call write_obsidian_note with type "idea" — routes to 1.Inbox',
+  'idea':          'call write_obsidian_note with type "idea" — routes to 1.Inbox',
+  'reference':     'call write_obsidian_note with type "reference" — routes to 1.Inbox',
+  'learning':      'call write_obsidian_note with type "learning" — routes to 2.Notes/Learnings',
   'noise':         'call write_supabase_capture only — do not route anywhere else',
 };
 

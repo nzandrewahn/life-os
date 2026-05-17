@@ -227,55 +227,35 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'write_obsidian_note',
     description:
-      'Create a new atomic note in the Obsidian vault via GitHub API. Always call read_obsidian_index first — pass the returned note titles as the related field to auto-generate [[wikilinks]]. ' +
-      'Folder routing rules: unclassified captures → "1.Inbox"; processed insights → "2.Notes/Captures"; references from URLs/YouTube → "2.Notes/Learnings"; daily logs → "2.Notes/Daily" with filename YYYY-MM-DD; weekly synthesis → "4.Synthesis" with filename YYYY-MM-DD-theme. ' +
-      'For project-specific reflections use update_obsidian_note on the existing project file instead. ' +
-      'Never write to: 3.Maps, Goals, Archive, Templates.',
+      'Create a new note in the Obsidian vault. Folder routing is enforced server-side based on type and content — pass type "learning" for learnings, "daily" for daily logs, anything else goes to Inbox. ' +
+      'Use filename YYYY-MM-DD for daily notes, kebab-case for everything else. Never pass project, source, or related — those fields are ignored.',
     input_schema: {
       type: 'object' as const,
       properties: {
         title: {
           type: 'string',
-          description: 'Descriptive title — not a dump of the raw capture. Written in the user\'s voice.',
+          description: 'Descriptive title in the user\'s voice.',
         },
         content: {
           type: 'string',
-          description: 'Note body text only — no frontmatter. One idea, written clearly.',
-        },
-        folder: {
-          type: 'string',
-          enum: ['1.Inbox', '2.Notes/Captures', '2.Notes/Learnings', '2.Notes/Daily', '4.Synthesis'],
-          description: 'Vault folder to write into.',
+          description: 'Note body — no frontmatter.',
         },
         filename: {
           type: 'string',
-          description: 'Filename without extension. Use YYYY-MM-DD for daily notes, kebab-case for everything else.',
+          description: 'Filename without extension. YYYY-MM-DD for daily, kebab-case otherwise.',
         },
         type: {
           type: 'string',
-          enum: ['insight', 'capture', 'reference', 'daily', 'synthesis'],
-          description: 'Note type for frontmatter.',
-        },
-        project: {
-          type: 'string',
-          description: 'Related project name for frontmatter (e.g. "Lost Marbles Studio").',
-        },
-        source: {
-          type: 'string',
-          description: 'Origin of the content. Defaults to "telegram-capture".',
+          enum: ['learning', 'idea', 'reference', 'daily'],
+          description: 'Note type. Determines folder: learning → 2.Notes/Learnings, daily → 2.Notes/Daily, everything else → 1.Inbox.',
         },
         tags: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Tags for frontmatter and indexing.',
-        },
-        related: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Note titles from read_obsidian_index to include as [[wikilinks]] in the related frontmatter field.',
+          description: 'Optional tags.',
         },
       },
-      required: ['title', 'content', 'folder', 'filename', 'type'],
+      required: ['title', 'content', 'filename', 'type'],
     },
   },
   {
