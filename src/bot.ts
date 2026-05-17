@@ -164,7 +164,14 @@ async function handleIncoming(
     console.log(`[${ts()}] caterina: ${agentReply.slice(0, 80)}...`);
   } catch (err) {
     console.error('error:', err);
-    await ctx.reply('something went wrong. please try again.');
+    const message = (err as { message?: string; error?: { message?: string } })?.message
+      ?? (err as { error?: { message?: string } })?.error?.message
+      ?? '';
+    if (message.toLowerCase().includes('credit balance') || message.toLowerCase().includes('billing')) {
+      await ctx.reply('out of api credits. top up at console.anthropic.com/settings/billing');
+    } else {
+      await ctx.reply('something went wrong. please try again.');
+    }
   }
 }
 
