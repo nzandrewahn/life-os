@@ -1,3 +1,4 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { Telegraf, type Context } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { readFileSync } from 'fs';
@@ -14,25 +15,38 @@ import { runCapturePipeline, resolvePending } from './capture/pipeline';
 import type { Classification } from './capture/classify';
 
 const ALLOWED_CHAT_ID = process.env.TELEGRAM_CHAT_ID!;
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const CAPTURE_TRIGGERS = [
-  'save', 'note', 'capture', 'remember',
-  'add task', 'add to', 'file this', 'log this',
-];
+type Intent = 'capture' | 'task_update' | 'brief_reply' | 'conversation';
 
-const MORNING_BRIEF_TRIGGERS = [
-  'morning brief', 'good morning', 'my brief',
-  'what do i have today', 'daily brief',
-];
+async function classifyIntent(userMessage: string, wasBrief: boolean): Promise<Intent> {
+  const response = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 20,
+    messages: [{
+      role: 'user',
+      content: `Classify this message into exactly one category:
 
-function isCaptureIntent(text: string): boolean {
-  const lower = text.toLowerCase();
-  return CAPTURE_TRIGGERS.some(trigger => lower.includes(trigger));
-}
+capture — user is saving a thought, idea, insight, learning, reference or note for their second brain. Usually starts with "capture", "note", "save", "insight", "learned" but not always. Must be something worth keeping.
 
-function isMorningBrief(text: string): boolean {
-  const lower = text.toLowerCase();
-  return MORNING_BRIEF_TRIGGERS.some(t => lower.includes(t));
+task_update — user wants to update a task's status, priority, energy, project or time estimate in their task board.
+
+brief_reply — user is replying to their morning brief with their energy level and hours available for the day.
+${wasBrief ? 'IMPORTANT: the last message WAS a morning brief, so this is likely a brief_reply if it contains a number.' : 'The last message was NOT a morning brief.'}
+
+conversation — anything else: questions, requests for info, commands, general chat, asking what Caterina can do, etc.
+
+Message: "${userMessage}"
+
+Reply with only one word: capture, task_update, brief_reply, or conversation.`,
+    }],
+  });
+
+  const text = response.content.find(b => b.type === 'text')?.text.trim().toLowerCase() ?? '';
+  if (text === 'capture') return 'capture';
+  if (text === 'task_update') return 'task_update';
+  if (text === 'brief_reply') return 'brief_reply';
+  return 'conversation';
 }
 
 interface PendingCapture {
@@ -41,18 +55,6 @@ interface PendingCapture {
 }
 const pending = new Map<string, PendingCapture>();
 const lastMessageWasBrief = new Map<string, boolean>();
-
-function isEnergyReply(text: string): { energy: number; hours: number } | null {
-  const energyMatch = text.match(/\b([1-9]|10)\b/);
-  const hoursMatch = text.match(/(\d+\.?\d*)\s*(?:hr|hrs|hour|hours)/i);
-  if (energyMatch && hoursMatch) {
-    return {
-      energy: parseInt(energyMatch[1], 10),
-      hours: parseFloat(hoursMatch[1]),
-    };
-  }
-  return null;
-}
 
 export function createBot(): Telegraf {
   const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
@@ -113,7 +115,7 @@ async function handleIncoming(
 
     let agentReply: string;
 
-    // Resolve pending capture clarification first
+    // Pending capture clarification takes priority — no intent classification needed
     const pendingCapture = pending.get(chatId);
     if (pendingCapture) {
       pending.delete(chatId);
@@ -128,36 +130,44 @@ async function handleIncoming(
       console.log(`[${ts()}] routing to evening log write`);
       await writeEveningLog(userMessage);
       agentReply = 'logged.';
-    } else if (lastMessageWasBrief.get(chatId)) {
-      const parsed = isEnergyReply(userMessage);
-      if (parsed) {
-        console.log(`[${ts()}] routing to day plan — energy: ${parsed.energy}, hours: ${parsed.hours}`);
-        lastMessageWasBrief.set(chatId, false);
-        agentReply = await runDayPlan(parsed.energy, parsed.hours);
-      } else {
-        lastMessageWasBrief.set(chatId, false);
-        agentReply = await runAgentLoop(userMessage, history);
-      }
-    } else if (isMorningBrief(userMessage)) {
-      console.log(`[${ts()}] routing to morning brief`);
-      agentReply = await generateMorningBrief();
-      lastMessageWasBrief.set(chatId, true);
-    } else if (isCaptureIntent(userMessage)) {
-      // Only route to capture if message contains explicit trigger keywords
-      console.log(`[${ts()}] routing to capture pipeline`);
-      const result = await runCapturePipeline(userMessage, history, contentType);
-
-      if (result.type === 'clarify') {
-        pending.set(chatId, { classification: result.classification, originalMessage: userMessage });
-        await ctx.reply(result.question);
-        return;
-      }
-
-      agentReply = result.message;
     } else {
-      // Default: conversational agent loop
-      console.log(`[${ts()}] routing to agent loop`);
-      agentReply = await runAgentLoop(userMessage, history);
+      const wasBrief = lastMessageWasBrief.get(chatId) ?? false;
+      const intent = await classifyIntent(userMessage, wasBrief);
+      console.log(`[bot] intent classified: ${intent} for message: ${userMessage.slice(0, 50)}`);
+
+      lastMessageWasBrief.set(chatId, false);
+
+      if (intent === 'capture') {
+        console.log(`[${ts()}] routing to capture pipeline`);
+        const result = await runCapturePipeline(userMessage, history, contentType);
+        if (result.type === 'clarify') {
+          pending.set(chatId, { classification: result.classification, originalMessage: userMessage });
+          await ctx.reply(result.question);
+          return;
+        }
+        agentReply = result.message;
+      } else if (intent === 'task_update') {
+        console.log(`[${ts()}] routing to agent loop (task update)`);
+        agentReply = await runAgentLoop(userMessage, history);
+      } else if (intent === 'brief_reply') {
+        const energyMatch = userMessage.match(/\b([1-9]|10)\b/);
+        const hoursMatch = userMessage.match(/(\d+\.?\d*)\s*(?:hr|hrs|hour|hours)/i);
+        if (energyMatch && hoursMatch) {
+          const energy = parseInt(energyMatch[1], 10);
+          const hours = parseFloat(hoursMatch[1]);
+          console.log(`[${ts()}] routing to day plan — energy: ${energy}, hours: ${hours}`);
+          agentReply = await runDayPlan(energy, hours);
+        } else {
+          // Classified as brief_reply but couldn't parse numbers — fall through to agent
+          agentReply = await runAgentLoop(userMessage, history);
+        }
+      } else {
+        console.log(`[${ts()}] routing to agent loop`);
+        agentReply = await runAgentLoop(userMessage, history);
+        if (agentReply.includes('what\'s your energy') || agentReply.includes('hours free today')) {
+          lastMessageWasBrief.set(chatId, true);
+        }
+      }
     }
 
     await logMessage(chatId, 'assistant', agentReply);
