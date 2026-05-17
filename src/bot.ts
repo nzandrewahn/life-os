@@ -9,6 +9,7 @@ import { lastMessageWasEveningCheckIn } from './state';
 import { logMessage, getRecentHistory } from './db';
 import { transcribeVoice } from './integrations/groq';
 import { formatForTelegram, escapeHtml } from './utils/formatter';
+import { isCreditsError } from './utils/errors';
 import { runCapturePipeline, resolvePending } from './capture/pipeline';
 import type { Classification } from './capture/classify';
 
@@ -164,14 +165,11 @@ async function handleIncoming(
     console.log(`[${ts()}] caterina: ${agentReply.slice(0, 80)}...`);
   } catch (err) {
     console.error('error:', err);
-    const message = (err as { message?: string; error?: { message?: string } })?.message
-      ?? (err as { error?: { message?: string } })?.error?.message
-      ?? '';
-    if (message.toLowerCase().includes('credit balance') || message.toLowerCase().includes('billing')) {
-      await ctx.reply('out of api credits. top up at console.anthropic.com/settings/billing');
-    } else {
-      await ctx.reply('something went wrong. please try again.');
+    if (isCreditsError(err)) {
+      await ctx.reply('⚠️ anthropic api credits are out — bot is down until you top up.\ngo to console.anthropic.com → billing');
+      return;
     }
+    await ctx.reply('something went wrong. please try again.');
   }
 }
 
