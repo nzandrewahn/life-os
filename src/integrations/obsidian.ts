@@ -24,7 +24,7 @@ function sanitizeFilename(name: string): string {
     .slice(0, 80);
 }
 
-const FORBIDDEN_FOLDERS = ['2.Notes/Core', 'Archive', 'Templates'];
+const FORBIDDEN_FOLDERS = ['2.Notes/Core', 'Archive', 'Templates', '3.Assets'];
 const LEARNING_SIGNALS = ['i learned', 'insight', 'realised', 'realized', 'key takeaway', 'from reading', 'from watching'];
 
 export function resolveFolder(type: string, content: string): string {
