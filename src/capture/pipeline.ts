@@ -1,27 +1,20 @@
-import { createClient } from '@supabase/supabase-js';
 import { detectContent } from './detect';
 import { classify, type Classification } from './classify';
 import { runAgentLoop } from '../agent/loop';
 import type { DbMessage } from '../types';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-);
-
 export type PipelineResult =
   | { type: 'reply'; message: string }
   | { type: 'clarify'; question: string; classification: Classification };
 
-// Routing table: classification → folder/action hint for agent directive
+// Routing table: classification → action hint for agent directive
 const ROUTING: Record<string, string> = {
   'project-task':  'call write_notion_task',
-  'life-task':     'call write_supabase_life_task then create_reminder',
+  'life-task':     'call write_life_task',
   'insight':       'call write_obsidian_note with type "idea" — routes to 1.Inbox',
   'idea':          'call write_obsidian_note with type "idea" — routes to 1.Inbox',
   'reference':     'call write_obsidian_note with type "reference" — routes to 1.Inbox',
   'learning':      'call write_obsidian_note with type "learning" — routes to 2.Notes/Learnings',
-  'noise':         'call write_supabase_capture only — do not route anywhere else',
 };
 
 export async function runCapturePipeline(
@@ -38,10 +31,12 @@ export async function runCapturePipeline(
   const textToClassify = detected.hasUrl ? (detected.url ?? message) : message;
   const cls = await classify(textToClassify);
 
-  await logCapture(message, detected.hasUrl ? 'link' : contentType, cls);
-
   if (cls.confidence < 0.7) {
     return { type: 'clarify', question: 'task or thought?', classification: cls };
+  }
+
+  if (cls.classification === 'noise') {
+    return { type: 'reply', message: 'noted.' };
   }
 
   const reply = await runAgentLoop(buildDirective(message, detected.hasUrl ? 'link' : contentType, cls), history);
@@ -69,11 +64,6 @@ async function runSplitPipeline(
 ): Promise<PipelineResult> {
   const [urlCls, thoughtCls] = await Promise.all([classify(url), classify(thought)]);
 
-  await Promise.all([
-    logCapture(url, 'link', urlCls),
-    logCapture(thought, 'text', thoughtCls),
-  ]);
-
   const directive = `[pipeline: split — url + thought]
 
 url: ${url}
@@ -93,7 +83,7 @@ function buildDirective(
   contentType: 'link' | 'text' | 'voice',
   cls: Classification
 ): string {
-  const routing = ROUTING[cls.classification] ?? 'log to supabase captures only';
+  const routing = ROUTING[cls.classification] ?? 'call write_obsidian_note with type "idea" — routes to 1.Inbox';
   const projectLine = cls.project ? `\nproject: ${cls.project}` : '';
 
   return `[pipeline: ${cls.classification}, confidence: ${cls.confidence}${projectLine}]
@@ -118,25 +108,3 @@ function resolveFromAnswer(answer: string, pending: Classification): Classificat
   return { ...pending, classification: 'insight', confidence: 1 };
 }
 
-async function logCapture(
-  raw_content: string,
-  content_type: 'link' | 'text' | 'voice',
-  cls: Classification
-): Promise<void> {
-  await supabase.from('captures').insert({
-    raw_content,
-    content_type,
-    classification: cls.classification,
-    project: cls.project || null,
-    confidence: cls.confidence,
-    routed_to: cls.classification === 'noise' ? 'discarded' : routedTo(cls.classification),
-  });
-}
-
-function routedTo(cls: string): string {
-  if (cls === 'project-task') return 'notion';
-  if (cls === 'life-task') return 'life_tasks';
-  if (['insight', 'idea', 'learning'].includes(cls)) return 'obsidian';
-  if (cls === 'reference') return 'notion';
-  return 'discarded';
-}
