@@ -22,6 +22,11 @@ const NOTION_CONTEXT = `
 
 all tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, Personal — go to the Andrew Task Board only. never invent tasks from context.
 
+## notion search tools
+
+- search_notion: search the workspace for any page or database by name. use before reading to find the right page ID.
+- read_notion_page: read full content of any page by id. use after search_notion to get actual pipeline docs, project pages, or reference material.
+
 ## life task tools
 
 - read_life_tasks: reads Andrew's personal todos from Google Tasks (groceries, errands, personal)

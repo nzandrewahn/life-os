@@ -47,11 +47,24 @@ async function generateMessage(prompt: string): Promise<string> {
   return block.text;
 }
 
+async function generateFocusAndQuote(): Promise<{ focus: string; quote: string }> {
+  const [focus, quote] = await Promise.all([
+    generateMessage(
+      `Based on Andrew's life context in the system prompt, write a 1-2 sentence morning reminder about the phase he's currently in — building the base, clearing debt, stacking toward his financial goal. Speak to the grind of right now, not the destination. Tone: mentor, direct, quiet. All lowercase. No fluff. Vary the angle each day so it doesn't feel repetitive. Reply with only the sentence(s), nothing else.`
+    ),
+    generateMessage(
+      `Based on Andrew's current life phase, goals, and what he's building, choose a short quote that resonates with where he is right now. It should feel like it was picked for today, not randomly selected. Source it from memory — a real line from a real person. Reply in this exact format and nothing else:\n"[quote]" — [author]`
+    ),
+  ]);
+  return { focus: focus.trim(), quote: quote.trim() };
+}
+
 export async function generateMorningBrief(): Promise<string> {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: AUCKLAND });
 
-  return runAgentLoop(
-    `generate morning brief for ${today}.
+  const [brief, { focus, quote }] = await Promise.all([
+    runAgentLoop(
+      `generate morning brief for ${today}.
 
 CRITICAL: Before generating the morning brief, you MUST call read_notion_tasks to get the actual current tasks. Never generate or assume tasks from context. If read_notion_tasks returns empty, say "no tasks found" in the today section. Never hallucinate tasks.
 
@@ -86,20 +99,17 @@ warm-up: straight lines then ellipses, 5 min
 
 what's your energy (1–10) and hours free today?
 
-— focus —
-[one punchy sentence — what andrew is building and why today's work matters. speak like a quiet coach, not a mission statement. ground it in the current phase: lost marbles dry run, proving the model, $1M NZD by 30. make it feel real, not motivational.]
-
-"[a short quote relevant to the day's tasks or the phase andrew is in. sourced from memory. no padding.]" — [author]
-
 field rules:
 - time estimate: show as [Xhr] — use [?hr] if missing
 - energy: second value in brackets [Xhr, energy] — omit if missing
 - project in parentheses after task name
-- no why field
-- focus section: one sentence only, no bullet points
-- quote: one line, real author`,
-    [],
-  );
+- no why field`,
+      [],
+    ),
+    generateFocusAndQuote(),
+  ]);
+
+  return `${brief}\n\n— focus —\n${focus}\n\n${quote}`;
 }
 
 async function runMorningBrief(telegram: Telegram): Promise<void> {

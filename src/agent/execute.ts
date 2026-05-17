@@ -10,6 +10,8 @@ import {
   markSketchingDone,
   readTrainingToday,
   markTrainingDone,
+  searchNotion,
+  readNotionPage,
   type WriteNotionTaskResult,
 } from '../integrations/notion';
 import { queryIndex, insertIndex } from '../memory/obsidian-index';
@@ -33,6 +35,8 @@ type ToolInput = Record<string, unknown>;
 export async function executeTool(name: string, input: ToolInput): Promise<unknown> {
   switch (name) {
     case 'read_notion_tasks':        return readNotionTasks();
+    case 'search_notion':            return searchNotion(input.query as string);
+    case 'read_notion_page':         return readNotionPage(input.page_id as string);
     case 'write_notion_task':        return execWriteNotionTask(input);
     case 'update_notion_task_status': return execUpdateNotionTask(input);
     case 'read_supabase_history':    return readSupabaseHistory(input);

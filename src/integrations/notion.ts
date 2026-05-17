@@ -294,3 +294,46 @@ export async function markTrainingDone(pageId: string): Promise<void> {
     properties: { Done: { checkbox: true } } as never,
   });
 }
+
+// ─── General search / read ────────────────────────────────────────────────────
+
+export interface NotionSearchResult {
+  id: string;
+  title: string;
+  url: string;
+}
+
+export async function searchNotion(query: string): Promise<NotionSearchResult[]> {
+  const response = await notion.search({
+    query,
+    filter: { value: 'page', property: 'object' },
+    page_size: 10,
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return response.results.map((p: any) => ({
+    id: p.id,
+    title:
+      p.properties?.title?.title?.[0]?.plain_text ||
+      p.properties?.Name?.title?.[0]?.plain_text ||
+      'untitled',
+    url: p.url,
+  }));
+}
+
+export async function readNotionPage(pageId: string): Promise<string> {
+  const blocks = await notion.blocks.children.list({
+    block_id: pageId,
+    page_size: 100,
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return blocks.results
+    .map((block: any) => {
+      const content = block[block.type];
+      if (content?.rich_text) {
+        return content.rich_text.map((t: any) => t.plain_text).join('');
+      }
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n');
+}

@@ -444,6 +444,28 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'search_notion',
+    description: "search Andrew's Notion workspace for any page or database by keyword. use this to find project pages, pipelines, docs before reading them.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        query: { type: 'string', description: 'Keyword or phrase to search for.' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'read_notion_page',
+    description: "read the full content of any Notion page by page ID. use after search_notion to get the actual content of a page or pipeline doc.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        page_id: { type: 'string', description: 'Notion page ID.' },
+      },
+      required: ['page_id'],
+    },
+  },
+  {
     name: 'fetch_url',
     description:
       'Fetch and summarise a URL — works for YouTube videos, articles, and web pages. Returns the title, description, and a one-paragraph summary of the content. Call this whenever the user sends a link before routing it to the inspiration archive or creating a reference note.',
