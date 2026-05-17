@@ -3,7 +3,6 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { TOOLS } from './tools';
 import { executeTool } from './execute';
-import type { DbMessage } from '../types';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MAX_ITERATIONS = 10;
@@ -67,16 +66,14 @@ function loadSystemPrompt(): string {
 
 export async function runAgentLoop(
   userMessage: string,
-  history: DbMessage[]
+  conversationHistory?: Array<{ role: string; content: string }>
 ): Promise<string> {
   const systemPrompt = loadSystemPrompt();
 
   const messages: Anthropic.MessageParam[] = [
-    ...history.map((msg, i) => ({
+    ...(conversationHistory ?? []).map(msg => ({
       role: msg.role as 'user' | 'assistant',
-      content: i === history.length - 1
-        ? [{ type: 'text' as const, text: msg.content, cache_control: { type: 'ephemeral' as const } }]
-        : msg.content,
+      content: msg.content,
     })),
     { role: 'user', content: userMessage },
   ];
@@ -90,7 +87,7 @@ export async function runAgentLoop(
       max_tokens: 4096,
       system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       tools: allTools,
-      tool_choice: iteration === 0 ? { type: 'any' } : { type: 'auto' },
+      tool_choice: { type: 'auto' },
       messages,
     });
     iteration++;

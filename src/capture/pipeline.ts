@@ -1,7 +1,6 @@
 import { detectContent } from './detect';
 import { classify, type Classification } from './classify';
 import { runAgentLoop } from '../agent/loop';
-import type { DbMessage } from '../types';
 
 export type PipelineResult =
   | { type: 'reply'; message: string }
@@ -17,9 +16,11 @@ const ROUTING: Record<string, string> = {
   'learning':      'call write_obsidian_note with type "learning" — routes to 2.Notes/Learnings',
 };
 
+type ConvoHistory = Array<{ role: string; content: string }>;
+
 export async function runCapturePipeline(
   message: string,
-  history: DbMessage[],
+  history: ConvoHistory,
   contentType: 'text' | 'voice' = 'text'
 ): Promise<PipelineResult> {
   const detected = detectContent(message);
@@ -48,7 +49,7 @@ export async function resolvePending(
   answer: string,
   originalMessage: string,
   pendingCls: Classification,
-  history: DbMessage[]
+  history: ConvoHistory
 ): Promise<string> {
   const resolved = resolveFromAnswer(answer, pendingCls);
   const detected = detectContent(originalMessage);
@@ -60,7 +61,7 @@ export async function resolvePending(
 async function runSplitPipeline(
   url: string,
   thought: string,
-  history: DbMessage[]
+  history: ConvoHistory
 ): Promise<PipelineResult> {
   const [urlCls, thoughtCls] = await Promise.all([classify(url), classify(thought)]);
 
