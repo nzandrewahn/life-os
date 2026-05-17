@@ -7,6 +7,8 @@ import { join } from 'path';
 import { runAgentLoop } from '../agent/loop';
 import { appendToNote, buildNote } from '../integrations/obsidian';
 import { setEveningCheckInSent } from '../state';
+import { readCalendarEvents } from '../integrations/google-calendar';
+import { readNotionTasks, readTrainingToday } from '../integrations/notion';
 
 const AUCKLAND = 'Pacific/Auckland';
 
@@ -84,11 +86,18 @@ warm-up: straight lines then ellipses, 5 min
 
 what's your energy (1–10) and hours free today?
 
+— focus —
+[one punchy sentence — what andrew is building and why today's work matters. speak like a quiet coach, not a mission statement. ground it in the current phase: lost marbles dry run, proving the model, $1M NZD by 30. make it feel real, not motivational.]
+
+"[a short quote relevant to the day's tasks or the phase andrew is in. sourced from memory. no padding.]" — [author]
+
 field rules:
 - time estimate: show as [Xhr] — use [?hr] if missing
 - energy: second value in brackets [Xhr, energy] — omit if missing
 - project in parentheses after task name
-- no why field`,
+- no why field
+- focus section: one sentence only, no bullet points
+- quote: one line, real author`,
     [],
   );
 }
@@ -100,10 +109,53 @@ async function runMorningBrief(telegram: Telegram): Promise<void> {
   console.log('[cron] morning brief sent');
 }
 
+async function generateTomorrowPreview(): Promise<string> {
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowStr = tomorrowDate.toLocaleDateString('sv-SE', { timeZone: AUCKLAND }); // YYYY-MM-DD
+
+  const [tasks, events, training] = await Promise.all([
+    readNotionTasks(),
+    readCalendarEvents(2),
+    readTrainingToday(),
+  ]);
+
+  const tomorrowEvents = events.filter(e => e.start.startsWith(tomorrowStr) && !e.allDay);
+
+  const priorityOrder = ['Critical', 'High', 'Normal', 'Low'];
+  const topTasks = [...tasks]
+    .sort((a, b) => priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority))
+    .slice(0, 2);
+
+  const lines: string[] = ['— tomorrow —'];
+
+  if (tomorrowEvents.length > 0) {
+    tomorrowEvents.forEach(e => lines.push(e.startAuckland.replace(/^.*, /, '') + ' ' + e.title.toLowerCase()));
+  }
+
+  if (training.session && training.session !== 'rest day' && training.session !== 'all sessions complete') {
+    const label = training.name ? training.name.toLowerCase() : 'training';
+    lines.push(`training: ${label}`);
+  }
+
+  topTasks.forEach(t => lines.push(t.name.toLowerCase()));
+
+  return lines.join('\n');
+}
+
 async function runEveningCheckIn(telegram: Telegram): Promise<void> {
   console.log('[cron] evening check-in starting');
   const chatId = getChatId();
-  await telegram.sendMessage(chatId, 'what got done today? anything to carry forward?');
+
+  let message = 'what got done today? anything to carry forward?';
+  try {
+    const preview = await generateTomorrowPreview();
+    message += `\n\n${preview}`;
+  } catch (err) {
+    console.error('[cron] tomorrow preview failed:', err instanceof Error ? err.message : err);
+  }
+
+  await telegram.sendMessage(chatId, message);
   setEveningCheckInSent(chatId);
   console.log('[cron] evening check-in sent');
 }
