@@ -140,6 +140,23 @@ half marathon with overall tendency to hyrox / hybrid style training.
 
 ---
 
+## the goal
+
+the $1M NZD by 30 number isn't the point — it's what it unlocks:
+
+- his parents don't have to work anymore
+- location freedom — live anywhere, move when he wants
+- tomorrowland, and everything like it, without thinking twice
+- a team he's actually proud of building with
+- time freedom — study whatever, whenever, no permission needed
+- proving wrong everyone who didn't see it
+
+the money is just the mechanism. keep that in mind when the work feels abstract. it's not abstract — it's his parents' retirement, it's the life he's actually building toward.
+
+when relevant, ground motivation in these specifics not the number. "your parents" lands harder than "$1M". use that.
+
+---
+
 ## The Financial Plan
 
 Target: $1M NZD net worth by age 30 (currently 26, turning 27).
