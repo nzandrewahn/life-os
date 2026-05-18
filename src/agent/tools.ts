@@ -506,6 +506,44 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'set_reminder',
+    description: "Send Andrew a Telegram message at a specific future time. Use ONLY for time-triggered nudges — \"ping me at X\", \"remind me at X time\", \"check in with me at X\". NOT for todos or action items (use write_life_task for those). NOT for time-blocked work (use create_calendar_event for that). Parse natural language times relative to Pacific/Auckland timezone.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        message: {
+          type: 'string',
+          description: "The message to send Andrew when the reminder fires. Write it as Caterina speaking — direct, no filler. Include enough context so it makes sense out of nowhere. e.g. \"follow up with Alex about the Tune invoice\" not just \"follow up\".",
+        },
+        fire_at: {
+          type: 'string',
+          description: 'ISO 8601 datetime string in Pacific/Auckland timezone. e.g. "2026-05-19T15:00:00+12:00"',
+        },
+      },
+      required: ['message', 'fire_at'],
+    },
+  },
+  {
+    name: 'list_reminders',
+    description: 'List all pending scheduled reminders that have not yet fired.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'cancel_reminder',
+    description: 'Cancel a pending scheduled reminder by ID. Get IDs from list_reminders.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        reminder_id: { type: 'string', description: 'The ping ID to cancel.' },
+      },
+      required: ['reminder_id'],
+    },
+  },
+  {
     name: 'fetch_url',
     description:
       'Fetch and summarise a URL — works for YouTube videos, articles, and web pages. Returns the title, description, and a one-paragraph summary of the content. Call this whenever the user sends a link before routing it to the inspiration archive or creating a reference note.',

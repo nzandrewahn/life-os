@@ -9,6 +9,7 @@ import { appendToNote, buildNote } from '../integrations/obsidian';
 import { setEveningCheckInSent } from '../state';
 import { readCalendarEvents } from '../integrations/google-calendar';
 import { readNotionTasks, readTrainingToday } from '../integrations/notion';
+import { getDuePings, clearPing } from '../scheduled-pings';
 
 const AUCKLAND = 'Pacific/Auckland';
 
@@ -252,9 +253,24 @@ export function startCrons(telegram: Telegram): void {
   // Weekly digest — 6:00pm Sunday
   schedule('0 18 * * 0', 'weekly digest', () => runWeeklyDigest(telegram));
 
-  console.log('[cron] 4 jobs registered (Pacific/Auckland)');
+  // Scheduled pings — every minute
+  cron.schedule('* * * * *', async () => {
+    const due = getDuePings();
+    for (const ping of due) {
+      clearPing(ping.id);
+      try {
+        await telegram.sendMessage(getChatId(), ping.message);
+        console.log('[ping] fired:', ping.message);
+      } catch (err) {
+        console.error('[ping] failed to send:', err instanceof Error ? err.message : err);
+      }
+    }
+  }, { timezone: AUCKLAND });
+
+  console.log('[cron] 5 jobs registered (Pacific/Auckland)');
   console.log('[cron]   morning brief:        0 7 * * *');
   console.log('[cron]   evening (post-work):  0 1 * * 2-5');
   console.log('[cron]   evening (rest day):   0 22 * * 0,1');
   console.log('[cron]   weekly digest:        0 18 * * 0');
+  console.log('[cron]   ping check:           * * * * *');
 }
