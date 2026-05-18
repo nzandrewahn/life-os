@@ -1,3 +1,4 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { appendFileSync } from 'fs';
 import { join } from 'path';
@@ -13,6 +14,7 @@ import {
   searchNotion,
   readNotionPage,
   type WriteNotionTaskResult,
+  type NotionTask,
 } from '../integrations/notion';
 import { queryIndex, insertIndex } from '../memory/obsidian-index';
 import { createReminder as iCloudCreateReminder } from '../integrations/reminders';
@@ -66,22 +68,83 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
   }
 }
 
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+
+type AlignmentVerdict = 'ALIGNED' | 'LATER' | 'DISTRACTION';
+
+async function checkTaskAlignment(
+  taskName: string,
+  why: string | undefined,
+  project: string | undefined,
+  activeTasks: NotionTask[]
+): Promise<{ verdict: AlignmentVerdict; context: string }> {
+  const taskList = activeTasks
+    .slice(0, 10)
+    .map(t => `- ${t.name} (${t.project ?? 'untagged'})`)
+    .join('\n') || 'none';
+
+  const response = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 100,
+    messages: [{
+      role: 'user',
+      content: `Andrew's current phase: building the base, clearing debt, stacking toward $1M NZD by 30. Active projects: Lost Marbles Studio (Itadaki Phase 1 active client, dry run phase), Abstracted Objects (paused), AI Assistant Build.
+
+New task being added: "${taskName}"
+Why: "${why || 'not specified'}"
+Project: "${project || 'unspecified'}"
+
+Current active tasks:
+${taskList}
+
+Assess in one sentence — is this:
+A) aligned and timely — core to current phase
+B) real but not now — valid later, not a current priority
+C) distraction — not aligned with current trajectory
+
+Reply with only: ALIGNED, LATER, or DISTRACTION
+followed by one short sentence of context (max 12 words).`,
+    }],
+  });
+
+  const text = response.content.find(b => b.type === 'text')?.text.trim() ?? '';
+  console.log('[task] alignment check:', text);
+
+  if (text.startsWith('DISTRACTION')) return { verdict: 'DISTRACTION', context: text.replace(/^DISTRACTION\s*/, '') };
+  if (text.startsWith('LATER')) return { verdict: 'LATER', context: text.replace(/^LATER\s*/, '') };
+  return { verdict: 'ALIGNED', context: '' };
+}
+
 async function execWriteNotionTask(input: ToolInput) {
-  const result: WriteNotionTaskResult = await writeNotionTask(
-    input.title as string,
-    input.project as string | undefined,
-    input.priority as string | undefined,
-    input.time_estimate as number | undefined,
-    input.energy as string | undefined,
-    input.why as string | undefined,
-  );
-  const project = result.project ?? 'untagged';
+  const taskName = input.title as string;
+  const why = input.why as string | undefined;
+  const project = input.project as string | undefined;
+
+  const [result, activeTasks] = await Promise.all([
+    writeNotionTask(
+      taskName,
+      project,
+      input.priority as string | undefined,
+      input.time_estimate as number | undefined,
+      input.energy as string | undefined,
+      why,
+    ),
+    readNotionTasks(),
+  ]);
+
+  const { verdict, context } = await checkTaskAlignment(taskName, why, project, activeTasks);
+
+  const projectLabel = result.project ?? 'untagged';
   const time = result.timeEstimate ? `${result.timeEstimate}hr` : '?hr';
-  return {
-    success: true,
-    id: result.id,
-    message: `added — ${result.title}\n→ ${project} · ${result.priority} · ${time} · ${result.energy} energy\nanything to adjust?`,
-  };
+  let message = `added — ${result.title}\n→ ${projectLabel} · ${result.priority} · ${time} · ${result.energy} energy`;
+
+  if (verdict === 'LATER') {
+    message += `\n\nthough this looks like a 'later' task. worth parking and revisiting when ${context}`;
+  } else if (verdict === 'DISTRACTION') {
+    message += `\n\nheads up — this might be pulling focus. ${context} worth checking if it's actually needed now.`;
+  }
+
+  return { success: true, id: result.id, message: message + '\nanything to adjust?' };
 }
 
 async function execUpdateNotionTask(input: ToolInput) {
