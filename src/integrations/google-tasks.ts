@@ -63,3 +63,30 @@ export async function completeLifeTask(taskId: string): Promise<void> {
     requestBody: { id: taskId, status: 'completed' },
   });
 }
+
+export async function updateLifeTask(
+  taskId: string,
+  params: { title?: string; notes?: string; due?: string }
+): Promise<LifeTask> {
+  const client = getClient();
+  const res = await client.tasks.patch({
+    tasklist: '@default',
+    task: taskId,
+    requestBody: {
+      ...(params.title && { title: params.title }),
+      ...(params.notes && { notes: params.notes }),
+      ...(params.due && { due: params.due }),
+    },
+  });
+  return {
+    id: res.data.id ?? '',
+    title: res.data.title ?? '',
+    notes: res.data.notes ?? undefined,
+    due: res.data.due ?? undefined,
+  };
+}
+
+export async function deleteLifeTask(taskId: string): Promise<void> {
+  const client = getClient();
+  await client.tasks.delete({ tasklist: '@default', task: taskId });
+}

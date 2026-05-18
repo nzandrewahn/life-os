@@ -302,6 +302,10 @@ export async function markTrainingDone(pageId: string): Promise<void> {
   });
 }
 
+export async function deleteNotionTask(pageId: string): Promise<void> {
+  await notion.pages.update({ page_id: pageId, in_trash: true } as never);
+}
+
 // ─── General search / read ────────────────────────────────────────────────────
 
 export interface NotionSearchResult {

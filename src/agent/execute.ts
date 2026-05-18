@@ -7,6 +7,7 @@ import {
   readNotionTasks,
   writeNotionTask,
   updateNotionTask,
+  deleteNotionTask,
   readSketchingToday,
   markSketchingDone,
   readTrainingToday,
@@ -28,6 +29,8 @@ import {
   readLifeTasks,
   writeLifeTask,
   completeLifeTask,
+  updateLifeTask,
+  deleteLifeTask,
 } from '../integrations/google-tasks';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
@@ -39,6 +42,7 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
     case 'read_notion_tasks':        return readNotionTasks();
     case 'search_notion':            return searchNotion(input.query as string);
     case 'read_notion_page':         return readNotionPage(input.page_id as string);
+    case 'delete_notion_task':       return deleteNotionTask(input.page_id as string);
     case 'write_notion_task':        return execWriteNotionTask(input);
     case 'update_notion_task_status': return execUpdateNotionTask(input);
     case 'read_supabase_history':    return readSupabaseHistory(input);
@@ -60,6 +64,8 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
     case 'read_life_tasks':          return readLifeTasks();
     case 'write_life_task':          return execWriteLifeTask(input);
     case 'complete_life_task':       return execCompleteLifeTask(input);
+    case 'update_life_task':         return updateLifeTask(input.task_id as string, { title: input.title as string | undefined, notes: input.notes as string | undefined, due: input.due as string | undefined });
+    case 'delete_life_task':         return deleteLifeTask(input.task_id as string);
     case 'update_context':           return execUpdateContext(input);
     case 'fetch_url':                return fetchUrl(input);
     case 'transcribe_audio':         return transcribeAudio(input);

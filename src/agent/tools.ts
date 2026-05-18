@@ -209,6 +209,31 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'update_life_task',
+    description: 'Update a life task title, notes, or due date in Google Tasks. Get task_id from read_life_tasks.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        task_id: { type: 'string', description: 'Google Tasks task ID.' },
+        title: { type: 'string', description: 'New task title.' },
+        notes: { type: 'string', description: 'New notes.' },
+        due: { type: 'string', description: 'New due date as RFC 3339 timestamp.' },
+      },
+      required: ['task_id'],
+    },
+  },
+  {
+    name: 'delete_life_task',
+    description: 'Permanently delete a life task from Google Tasks. Requires explicit confirmation from Andrew before calling.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        task_id: { type: 'string', description: 'Google Tasks task ID from read_life_tasks.' },
+      },
+      required: ['task_id'],
+    },
+  },
+  {
     name: 'write_supabase_life_task',
     description:
       'Create a life task in Supabase. Use for personal, logistical, non-project tasks — errands, admin, health, groceries, personal appointments. Always call create_reminder immediately after this tool — these two are always called together. Do NOT use for project tasks; those go to write_notion_task.',
@@ -409,6 +434,17 @@ export const TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ['event_id'],
+    },
+  },
+  {
+    name: 'delete_notion_task',
+    description: 'Move a Notion task to trash. Requires explicit confirmation from Andrew before calling. Get page_id from read_notion_tasks.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        page_id: { type: 'string', description: 'Notion page ID from read_notion_tasks.' },
+      },
+      required: ['page_id'],
     },
   },
   {
