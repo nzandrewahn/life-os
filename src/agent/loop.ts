@@ -57,7 +57,7 @@ function loadSystemPrompt(): string {
   }
   try {
     const updates = readFileSync(join(process.cwd(), 'context-updates.md'), 'utf-8');
-    if (updates.trim()) return `${base}${NOTION_CONTEXT}\n\n## dynamic context updates\n\n${updates}`;
+    if (updates.trim()) return `${base}${NOTION_CONTEXT}\n\n## caterina's running context\n\n${updates}`;
   } catch {
     // file doesn't exist yet — skip silently
   }

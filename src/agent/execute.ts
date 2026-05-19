@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
-import { appendFileSync } from 'fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { buildNote, readNote, writeNote, appendToNote, resolveFolder } from '../integrations/obsidian';
 import {
@@ -32,7 +32,6 @@ import {
   updateLifeTask,
   deleteLifeTask,
 } from '../integrations/google-tasks';
-import { addPing, listPings, clearPing } from '../scheduled-pings';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
@@ -67,23 +66,6 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
     case 'complete_life_task':       return execCompleteLifeTask(input);
     case 'update_life_task':         return updateLifeTask(input.task_id as string, { title: input.title as string | undefined, notes: input.notes as string | undefined, due: input.due as string | undefined });
     case 'delete_life_task':         return deleteLifeTask(input.task_id as string);
-    case 'set_reminder': {
-      const fireAt = new Date(input.fire_at as string);
-      const id = addPing(input.message as string, fireAt);
-      const timeStr = fireAt.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', hour: '2-digit', minute: '2-digit' });
-      return `reminder set — "${input.message}" at ${timeStr} (id: ${id})`;
-    }
-    case 'list_reminders': {
-      const pending = listPings();
-      if (pending.length === 0) return 'no pending reminders';
-      return pending.map(p => {
-        const timeStr = p.fireAt.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', hour: '2-digit', minute: '2-digit' });
-        return `[${p.id}] "${p.message}" → ${timeStr}`;
-      }).join('\n');
-    }
-    case 'cancel_reminder':
-      clearPing(input.reminder_id as string);
-      return `reminder ${input.reminder_id} cancelled`;
     case 'update_context':           return execUpdateContext(input);
     case 'fetch_url':                return fetchUrl(input);
     case 'transcribe_audio':         return transcribeAudio(input);
@@ -336,13 +318,12 @@ async function execDeleteCalendarEvent(input: ToolInput) {
 }
 
 async function execUpdateContext(input: ToolInput) {
-  const fact = input.fact as string;
-  const category = input.category as string;
-  const timestamp = new Date().toISOString().split('T')[0];
-  const entry = `[${timestamp}] [${category}] ${fact}\n`;
+  const entry = input.entry as string;
   const filePath = join(process.cwd(), 'context-updates.md');
-  appendFileSync(filePath, entry, 'utf-8');
-  return { success: true, message: `context updated: ${fact}` };
+  const existing = existsSync(filePath) ? readFileSync(filePath, 'utf-8') : '';
+  writeFileSync(filePath, (existing + '\n' + entry).trim(), 'utf-8');
+  console.log('[context] updated:', entry);
+  return 'context updated';
 }
 
 async function fetchUrl(input: ToolInput) {

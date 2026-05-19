@@ -186,7 +186,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'write_life_task',
-    description: 'Add a new personal life task to Google Tasks. Use for groceries, errands, personal appointments, and non-project todos.',
+    description: "Add a personal task or reminder to Google Tasks. Use for todos, action items, AND time-based reminders (\"remind me to X at Y time\", \"follow up on X tomorrow\"). For time-based items, pass the due datetime. Shows natively on Andrew's phone. Persists across server restarts.",
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -466,21 +466,16 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'update_context',
     description:
-      'Persist an important fact learned through conversation that should be remembered permanently beyond the 14-day message history window. Use when Andrew mentions something significant that changes his situation — a new client, a location change, a business decision, a major life update. Do NOT use for tasks or fleeting thoughts — those go to Supabase or Obsidian. Appends to context-updates.md with a timestamp.',
+      "Persist something worth remembering about Andrew to long-term context. Use proactively when you observe a pattern, preference, tendency, or important fact that should inform future interactions. Examples: behavioural patterns, recurring tendencies, preferences discovered in conversation, important life updates. Be specific and write in third person. Do NOT use for temporary state or single-session info.",
     input_schema: {
       type: 'object' as const,
       properties: {
-        fact: {
+        entry: {
           type: 'string',
-          description: 'The fact to persist, written in third person (e.g. "Andrew is moving to Sydney in June").',
-        },
-        category: {
-          type: 'string',
-          enum: ['situation', 'business', 'personal', 'financial'],
-          description: 'Category of the update.',
+          description: 'The context entry to persist. Format: "[date] [category]: [observation]" e.g. "2026-05-19 behaviour: Andrew tends to default to ritual (sketching, exercise) over high-leverage work when time is short. needs nudging toward output over process."',
         },
       },
-      required: ['fact', 'category'],
+      required: ['entry'],
     },
   },
   {
@@ -503,44 +498,6 @@ export const TOOLS: Anthropic.Tool[] = [
         page_id: { type: 'string', description: 'Notion page ID.' },
       },
       required: ['page_id'],
-    },
-  },
-  {
-    name: 'set_reminder',
-    description: "Send Andrew a Telegram message at a specific future time. Use ONLY for time-triggered nudges — \"ping me at X\", \"remind me at X time\", \"check in with me at X\". NOT for todos or action items (use write_life_task for those). NOT for time-blocked work (use create_calendar_event for that). Parse natural language times relative to Pacific/Auckland timezone.",
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        message: {
-          type: 'string',
-          description: "The message to send Andrew when the reminder fires. Write it as Caterina speaking — direct, no filler. Include enough context so it makes sense out of nowhere. e.g. \"follow up with Alex about the Tune invoice\" not just \"follow up\".",
-        },
-        fire_at: {
-          type: 'string',
-          description: 'ISO 8601 datetime string in Pacific/Auckland timezone. e.g. "2026-05-19T15:00:00+12:00"',
-        },
-      },
-      required: ['message', 'fire_at'],
-    },
-  },
-  {
-    name: 'list_reminders',
-    description: 'List all pending scheduled reminders that have not yet fired.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {},
-      required: [],
-    },
-  },
-  {
-    name: 'cancel_reminder',
-    description: 'Cancel a pending scheduled reminder by ID. Get IDs from list_reminders.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        reminder_id: { type: 'string', description: 'The ping ID to cancel.' },
-      },
-      required: ['reminder_id'],
     },
   },
   {

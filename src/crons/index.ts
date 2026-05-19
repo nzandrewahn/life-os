@@ -9,7 +9,6 @@ import { appendToNote, buildNote } from '../integrations/obsidian';
 import { setEveningCheckInSent } from '../state';
 import { readCalendarEvents } from '../integrations/google-calendar';
 import { readNotionTasks, readTrainingToday } from '../integrations/notion';
-import { getDuePings, clearPing } from '../scheduled-pings';
 
 const AUCKLAND = 'Pacific/Auckland';
 
@@ -253,17 +252,29 @@ export function startCrons(telegram: Telegram): void {
   // Weekly digest — 6:00pm Sunday
   schedule('0 18 * * 0', 'weekly digest', () => runWeeklyDigest(telegram));
 
-  // Scheduled pings — every minute
-  cron.schedule('* * * * *', async () => {
-    const due = getDuePings();
-    for (const ping of due) {
-      clearPing(ping.id);
-      try {
-        await telegram.sendMessage(getChatId(), ping.message);
-        console.log('[ping] fired:', ping.message);
-      } catch (err) {
-        console.error('[ping] failed to send:', err instanceof Error ? err.message : err);
-      }
+  // Identity ping — Wednesday 11am
+  const PRINCIPLES = [
+    "I am the type of person that devotes himself to the craft and not on an outcome.",
+    "I am the type of person that doesn't let fear control his life.",
+    "I am the type of person that makes financially responsible decisions.",
+    "I am the type of person that does what he says.",
+    "I am the type of person that applies himself to the work he does.",
+    "I am the type of person that is not afraid to knock.",
+    "I am the type of person that finds fulfilment in the process.",
+    "I am the type of person that is able to work without people looking.",
+    "I am the type of person that is able to understand that being alone doesn't mean I am alone.",
+    "I am the type of person that doesn't let anger control him.",
+    "I am the type of person that creates more than he consumes.",
+    "The entire world is fucking malleable. All the rules and things you think can't be broken are all illusions.",
+  ];
+  cron.schedule('0 11 * * 3', async () => {
+    const idx = new Date().getDate() % PRINCIPLES.length;
+    const principle = PRINCIPLES[idx];
+    try {
+      await telegram.sendMessage(getChatId(), principle);
+      console.log('[identity] pinged:', principle);
+    } catch (err) {
+      console.error('[identity] failed to send:', err instanceof Error ? err.message : err);
     }
   }, { timezone: AUCKLAND });
 
@@ -272,5 +283,5 @@ export function startCrons(telegram: Telegram): void {
   console.log('[cron]   evening (post-work):  0 1 * * 2-5');
   console.log('[cron]   evening (rest day):   0 22 * * 0,1');
   console.log('[cron]   weekly digest:        0 18 * * 0');
-  console.log('[cron]   ping check:           * * * * *');
+  console.log('[cron]   identity ping:        0 11 * * 3');
 }
