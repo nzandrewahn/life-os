@@ -70,12 +70,24 @@ export async function runAgentLoop(
 ): Promise<string> {
   const systemPrompt = loadSystemPrompt();
 
+  const now = new Date().toLocaleString('en-NZ', {
+    timeZone: 'Pacific/Auckland',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const timeContext = `[current time: ${now} NZT]`;
+  console.log('[time] injected:', now);
+
   const messages: Anthropic.MessageParam[] = [
     ...(conversationHistory ?? []).map(msg => ({
       role: msg.role as 'user' | 'assistant',
       content: msg.content,
     })),
-    { role: 'user', content: userMessage },
+    { role: 'user', content: `${timeContext}\n${userMessage}` },
   ];
 
   let iteration = 0;
