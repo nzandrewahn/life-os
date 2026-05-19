@@ -66,6 +66,26 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
     case 'complete_life_task':       return execCompleteLifeTask(input);
     case 'update_life_task':         return updateLifeTask(input.task_id as string, { title: input.title as string | undefined, notes: input.notes as string | undefined, due: input.due as string | undefined });
     case 'delete_life_task':         return deleteLifeTask(input.task_id as string);
+    case 'read_commitments': {
+      const filePath = join(process.cwd(), 'context-updates.md');
+      const content = existsSync(filePath) ? readFileSync(filePath, 'utf-8') : '';
+      const commitments = content
+        .split('\n')
+        .filter(l => l.includes('commitment:') && !l.includes('status: complete'))
+        .join('\n');
+      return commitments || 'no active commitments tracked';
+    }
+    case 'mark_commitment_complete': {
+      const filePath = join(process.cwd(), 'context-updates.md');
+      const content = existsSync(filePath) ? readFileSync(filePath, 'utf-8') : '';
+      const snippet = (input.commitment as string).slice(0, 30).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const updated = content.replace(
+        new RegExp(`(.*${snippet}.*status: active.*)`, 'g'),
+        (match) => match.replace('status: active', 'status: complete'),
+      );
+      writeFileSync(filePath, updated);
+      return 'commitment marked complete';
+    }
     case 'update_context':           return execUpdateContext(input);
     case 'fetch_url':                return fetchUrl(input);
     case 'transcribe_audio':         return transcribeAudio(input);

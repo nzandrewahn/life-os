@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import type { Telegram } from 'telegraf';
 import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { runAgentLoop } from '../agent/loop';
 import { appendToNote, buildNote } from '../integrations/obsidian';
@@ -74,6 +74,7 @@ steps — call ALL of these tools before writing anything:
 3. call read_sketching_today — get today's sketching session
 4. call read_google_calendar with days=1 — get today's events
 5. call read_life_tasks — get personal todos from Google Tasks
+6. call read_commitments — get active commitments Andrew has made
 
 format exactly as shown below. all lowercase. no asterisks. no markdown symbols. no commentary.
 
@@ -96,6 +97,9 @@ warm-up: straight lines then ellipses, 5 min
 
 — life —
 [pending life tasks from read_life_tasks if any — omit this section entirely if none]
+
+— commitments —
+[active commitments from read_commitments. for each: show the commitment and its deadline. if overdue or due today, prefix with ⚠. omit this section entirely if no active commitments.]
 
 what's your energy (1–10) and hours free today?
 
@@ -163,6 +167,19 @@ async function runEveningCheckIn(telegram: Telegram): Promise<void> {
     message += `\n\n${preview}`;
   } catch (err) {
     console.error('[cron] tomorrow preview failed:', err instanceof Error ? err.message : err);
+  }
+
+  try {
+    const contextPath = join(process.cwd(), 'context-updates.md');
+    const content = existsSync(contextPath) ? readFileSync(contextPath, 'utf-8') : '';
+    const activeCommitments = content
+      .split('\n')
+      .filter(l => l.includes('commitment:') && !l.includes('status: complete'));
+    if (activeCommitments.length > 0) {
+      message += `\n\n— on track? —\n${activeCommitments.join('\n')}`;
+    }
+  } catch (err) {
+    console.error('[cron] commitment check failed:', err instanceof Error ? err.message : err);
   }
 
   await telegram.sendMessage(chatId, message);
@@ -278,10 +295,38 @@ export function startCrons(telegram: Telegram): void {
     }
   }, { timezone: AUCKLAND });
 
-  console.log('[cron] 5 jobs registered (Pacific/Auckland)');
+  // Weekly accountability — Friday 6pm
+  schedule('0 18 * * 5', 'weekly accountability', async () => {
+    const contextPath = join(process.cwd(), 'context-updates.md');
+    const content = existsSync(contextPath) ? readFileSync(contextPath, 'utf-8') : '';
+    const commitments = content
+      .split('\n')
+      .filter(l => l.includes('commitment:') && !l.includes('status: complete'));
+
+    if (commitments.length === 0) return;
+
+    const anthropic = getAnthropicClient();
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 300,
+      system: loadSystemPrompt(),
+      messages: [{
+        role: 'user',
+        content: `it's end of week. these are andrew's active commitments:\n${commitments.join('\n')}\n\nwrite a brief end of week accountability check-in. be direct. flag what's done, what's not, and what needs to happen next week. tone: coach, not judge. max 5 lines.`,
+      }],
+    });
+    const text = response.content.find(b => b.type === 'text');
+    if (text && text.type === 'text') {
+      await telegram.sendMessage(getChatId(), text.text);
+      console.log('[accountability] weekly check-in sent');
+    }
+  });
+
+  console.log('[cron] 6 jobs registered (Pacific/Auckland)');
   console.log('[cron]   morning brief:        0 7 * * *');
   console.log('[cron]   evening (post-work):  0 1 * * 2-5');
   console.log('[cron]   evening (rest day):   0 22 * * 0,1');
   console.log('[cron]   weekly digest:        0 18 * * 0');
   console.log('[cron]   identity ping:        0 11 * * 3');
+  console.log('[cron]   accountability:       0 18 * * 5');
 }

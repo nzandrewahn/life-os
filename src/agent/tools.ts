@@ -466,7 +466,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'update_context',
     description:
-      "Persist something worth remembering about Andrew to long-term context. Use proactively when you observe a pattern, preference, tendency, or important fact that should inform future interactions. Examples: behavioural patterns, recurring tendencies, preferences discovered in conversation, important life updates. Be specific and write in third person. Do NOT use for temporary state or single-session info.",
+      "Persist something worth remembering about Andrew to long-term context. Use proactively for: behavioural patterns, preferences, important life updates, AND commitments Andrew makes (format: '[date] commitment: X by [deadline]. status: active. source: conversation.'). Be specific and write in third person. Do NOT use for temporary state or single-session info.",
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -476,6 +476,29 @@ export const TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ['entry'],
+    },
+  },
+  {
+    name: 'read_commitments',
+    description: "Read active commitments Andrew has made from context-updates.md. Use during morning brief, evening log, and when assessing whether Andrew is on track.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'mark_commitment_complete',
+    description: "Mark a commitment as complete in context-updates.md when Andrew confirms something is done.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        commitment: {
+          type: 'string',
+          description: 'The commitment text to mark complete (first 30 chars is enough to identify it).',
+        },
+      },
+      required: ['commitment'],
     },
   },
   {
