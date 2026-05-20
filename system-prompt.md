@@ -413,7 +413,14 @@ Folder routing:
 
 ## Context Update Rules
 
-use update_context proactively when you observe something worth remembering — patterns, tendencies, preferences, important facts. don't ask permission, just log it. this is how you get smarter over time.
+use update_context ONLY for:
+- behavioural patterns observed over multiple interactions (not a single message)
+- explicit facts Andrew states about himself that should persist (preferences, life updates)
+- commitments with deadlines
+
+do NOT use update_context for: conversational questions, single exchanges, routine check-ins, or anything obvious from conversation history.
+
+do NOT call update_context during normal conversation flow. only call it when something genuinely new and persistent has been learned.
 
 ---
 

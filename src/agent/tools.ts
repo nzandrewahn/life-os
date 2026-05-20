@@ -154,7 +154,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'write_life_task',
-    description: "Add a personal task or reminder to Google Tasks. Use for todos, action items, AND time-based reminders (\"remind me to X at Y time\", \"follow up on X tomorrow\"). For time-based items, pass the due datetime. Shows natively on Andrew's phone. Persists across server restarts.",
+    description: "Add a personal task or reminder to Google Tasks. Use for todos, action items, AND time-based reminders (\"remind me to X at Y time\", \"follow up on X tomorrow\"). For time-based items, pass the due datetime. Shows natively on Andrew's phone. Persists across server restarts. Note: Google Tasks only stores due dates, not times. If a specific time is given, it will be appended to the task title automatically e.g. 'Call Alex @ 3:00 PM'.",
     input_schema: {
       type: 'object' as const,
       properties: {

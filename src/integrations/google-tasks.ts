@@ -44,12 +44,30 @@ export async function readLifeTasks(): Promise<LifeTask[]> {
 
 export async function writeLifeTask(title: string, notes?: string, due?: string): Promise<string> {
   const client = getClient();
+
+  let taskTitle = title;
+  if (due) {
+    const hasTime = due.includes('T') && !due.endsWith('T00:00:00') && !due.endsWith('T00:00:00.000Z');
+    if (hasTime) {
+      const timeStr = new Date(due).toLocaleTimeString('en-NZ', {
+        timeZone: 'Pacific/Auckland',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      taskTitle = `${title} @ ${timeStr}`;
+    }
+  }
+
+  const dueFormatted = due
+    ? new Date(due).toISOString().split('T')[0] + 'T00:00:00.000Z'
+    : undefined;
+
   const res = await client.tasks.insert({
     tasklist: '@default',
     requestBody: {
-      title,
+      title: taskTitle,
       notes: notes ?? undefined,
-      due: due ?? undefined,
+      ...(dueFormatted && { due: dueFormatted }),
     },
   });
   return res.data.id ?? '';
