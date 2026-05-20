@@ -463,7 +463,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'get_goal_tree',
-    description: "Get Andrew's full goal tree — top-level goals and all sub-goals with their status, priority, and deadlines. Use to understand the big picture, check alignment, or answer questions about goals. Call this at the start of any conversation about goals, planning, or priorities.",
+    description: "Returns Andrew's full goal hierarchy as a live Supabase query. Call this IMMEDIATELY when Andrew asks about his goals, goal tree, priorities, or what he is working toward. This is NOT a Notion page or Obsidian note — do not search for it. It is a database query. Always call this tool; never describe goals from memory.",
     input_schema: {
       type: 'object' as const,
       properties: {},
