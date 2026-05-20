@@ -30,7 +30,20 @@ all tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, Personal —
 
 - read_life_tasks: reads Andrew's personal todos from Google Tasks (groceries, errands, personal)
 - write_life_task: adds a personal todo to Google Tasks
-- complete_life_task: marks a personal todo as done (pass task_id from read_life_tasks)`;
+- complete_life_task: marks a personal todo as done (pass task_id from read_life_tasks)
+
+## goal and commitment tools
+
+Andrew's goals and commitments are stored in Supabase. these are NOT documents in Notion or Obsidian — always use these tools, never search for them.
+
+- get_goal_tree: returns Andrew's full goal tree from Supabase. call this whenever asked about goals, priorities, or what Andrew is working toward. never describe goals from memory — always call this tool first.
+- add_goal: adds a new goal to the tree. infer parent from context.
+- complete_goal: marks a goal as complete.
+- add_commitment: logs a commitment Andrew has made. call proactively whenever Andrew states an intention with a timeframe. infer goal_id from get_goal_tree.
+- get_active_commitments: returns all active commitments with deadlines. use during morning brief and any planning conversation.
+- get_overdue_commitments: returns commitments past their deadline. use to apply pressure.
+- complete_commitment: marks a commitment done. call when Andrew confirms completion.
+- log_slip: logs a missed deadline. increments slip count which affects response intensity.`;
 
 const webSearchTool = {
   type: 'web_search_20250305',
