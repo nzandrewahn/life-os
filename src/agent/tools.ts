@@ -462,6 +462,97 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'get_goal_tree',
+    description: "Get Andrew's full goal tree — top-level goals and all sub-goals with their status, priority, and deadlines. Use to understand the big picture, check alignment, or answer questions about goals. Call this at the start of any conversation about goals, planning, or priorities.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'add_goal',
+    description: "Add a new goal to Andrew's goal tree. Infer the parent goal from context — e.g. a new client project likely sits under Lost Marbles. Always confirm the goal and where it sits in the tree before adding.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Goal title.' },
+        description: { type: 'string', description: 'Optional description.' },
+        parent_goal_id: { type: 'string', description: 'UUID of parent goal. Get from get_goal_tree.' },
+        priority: { type: 'string', enum: ['critical', 'high', 'normal', 'low'], description: 'Goal priority.' },
+        deadline: { type: 'string', description: 'ISO date string e.g. 2026-06-30.' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'add_commitment',
+    description: "Log a commitment Andrew has made. Use when Andrew states an intention with a timeframe — in conversation, brief reply, or evening log. Infer goal_id from context using get_goal_tree. Log commitments proactively — do not wait to be asked.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        statement: { type: 'string', description: 'The commitment exactly as stated, cleaned up. e.g. "Complete Itadaki client brief by Friday 23 May".' },
+        goal_id: { type: 'string', description: 'UUID of the related goal. Get from get_goal_tree.' },
+        deadline: { type: 'string', description: 'ISO datetime string.' },
+        source: { type: 'string', enum: ['conversation', 'morning_brief', 'evening_log'], description: 'Where the commitment was made.' },
+      },
+      required: ['statement'],
+    },
+  },
+  {
+    name: 'get_active_commitments',
+    description: 'Get all active commitments with their deadlines and related goals. Use during morning brief, evening log, and mid-afternoon check-in. Returns commitment IDs needed for complete_commitment and log_slip.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'get_overdue_commitments',
+    description: 'Get commitments that are past their deadline and still active. Use to flag slippage and apply pressure.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'complete_commitment',
+    description: 'Mark a commitment as complete when Andrew confirms it is done. Get commitment_id from get_active_commitments.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        commitment_id: { type: 'string', description: 'UUID of the commitment to complete.' },
+      },
+      required: ['commitment_id'],
+    },
+  },
+  {
+    name: 'log_slip',
+    description: 'Log a commitment slip when Andrew confirms something was not done by the deadline. Include reason if given. Provide new_deadline if rescheduled. Increments the slip count — affects how much pressure Caterina applies going forward.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        commitment_id: { type: 'string', description: 'UUID of the slipped commitment.' },
+        reason: { type: 'string', description: 'Reason for the slip.' },
+        new_deadline: { type: 'string', description: 'Rescheduled deadline as ISO datetime.' },
+      },
+      required: ['commitment_id'],
+    },
+  },
+  {
+    name: 'complete_goal',
+    description: 'Mark a goal as complete. Get goal_id from get_goal_tree.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        goal_id: { type: 'string', description: 'UUID of the goal to complete.' },
+      },
+      required: ['goal_id'],
+    },
+  },
+  {
     name: 'fetch_url',
     description:
       'Fetch and summarise a URL — works for YouTube videos, articles, and web pages. Returns the title, description, and a one-paragraph summary of the content. Call this whenever the user sends a link before routing it to the inspiration archive or creating a reference note.',

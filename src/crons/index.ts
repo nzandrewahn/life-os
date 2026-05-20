@@ -9,6 +9,11 @@ import { appendToNote, buildNote } from '../integrations/obsidian';
 import { setEveningCheckInSent } from '../state';
 import { readCalendarEvents } from '../integrations/google-calendar';
 import { readNotionTasks, readTrainingToday } from '../integrations/notion';
+import {
+  getActiveCommitments,
+  getOverdueCommitments,
+  getDueTodayCommitments,
+} from '../integrations/goals';
 
 const AUCKLAND = 'Pacific/Auckland';
 
@@ -62,9 +67,19 @@ async function generateFocusAndQuote(): Promise<{ focus: string; quote: string }
 export async function generateMorningBrief(): Promise<string> {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: AUCKLAND });
 
+  const [overdue, dueToday] = await Promise.all([
+    getOverdueCommitments().catch(() => []),
+    getDueTodayCommitments().catch(() => []),
+  ]);
+
+  const commitmentContext = (overdue.length > 0 || dueToday.length > 0)
+    ? `\nOverdue commitments: ${JSON.stringify(overdue)}\nDue today: ${JSON.stringify(dueToday)}`
+    : '\nNo overdue or due-today commitments.';
+
   const [brief, { focus, quote }] = await Promise.all([
     runAgentLoop(
       `generate morning brief for ${today}.
+${commitmentContext}
 
 CRITICAL: Before generating the morning brief, you MUST call read_notion_tasks to get the actual current tasks. Never generate or assume tasks from context. If read_notion_tasks returns empty, say "no tasks found" in the today section. Never hallucinate tasks.
 
@@ -74,7 +89,6 @@ steps — call ALL of these tools before writing anything:
 3. call read_sketching_today — get today's sketching session
 4. call read_google_calendar with days=1 — get today's events
 5. call read_life_tasks — get personal todos from Google Tasks
-6. call read_commitments — get active commitments Andrew has made
 
 format exactly as shown below. all lowercase. no asterisks. no markdown symbols. no commentary.
 
@@ -99,7 +113,7 @@ warm-up: straight lines then ellipses, 5 min
 [pending life tasks from read_life_tasks if any — omit this section entirely if none]
 
 — commitments —
-[active commitments from read_commitments. for each: show the commitment and its deadline. if overdue or due today, prefix with ⚠. omit this section entirely if no active commitments.]
+[use the pre-fetched overdue and due-today commitment data injected above. for each: show the commitment statement and deadline. prefix overdue items with ⚠ and show days overdue. prefix due-today items with ⚠. omit this section entirely if no overdue or due-today commitments.]
 
 what's your energy (1–10) and hours free today?
 
@@ -170,13 +184,22 @@ async function runEveningCheckIn(telegram: Telegram): Promise<void> {
   }
 
   try {
-    const contextPath = join(process.cwd(), 'context-updates.md');
-    const content = existsSync(contextPath) ? readFileSync(contextPath, 'utf-8') : '';
-    const activeCommitments = content
-      .split('\n')
-      .filter(l => l.includes('commitment:') && !l.includes('status: complete'));
-    if (activeCommitments.length > 0) {
-      message += `\n\n— on track? —\n${activeCommitments.join('\n')}`;
+    const [overdue, dueToday] = await Promise.all([
+      getOverdueCommitments(),
+      getDueTodayCommitments(),
+    ]);
+
+    const flagged = [...overdue, ...dueToday];
+    if (flagged.length > 0) {
+      const lines = flagged.map(c => {
+        const isOverdue = overdue.some(o => o.id === c.id);
+        const daysOverdue = isOverdue
+          ? Math.floor((Date.now() - new Date(c.deadline!).getTime()) / 86400000)
+          : 0;
+        const prefix = isOverdue ? `⚠ ${daysOverdue}d overdue` : '⚠ due today';
+        return `${prefix}: ${c.statement}`;
+      });
+      message += `\n\n— on track? —\n${lines.join('\n')}`;
     }
   } catch (err) {
     console.error('[cron] commitment check failed:', err instanceof Error ? err.message : err);
@@ -280,8 +303,10 @@ function getNextPrinciple(): string {
 }
 
 export function startCrons(telegram: Telegram): void {
-  // Morning brief — 7:00am daily
-  schedule('0 7 * * *', 'morning brief', () => runMorningBrief(telegram));
+  const sendMessage = (text: string) => telegram.sendMessage(getChatId(), text);
+
+  // Morning brief — 8:00am daily
+  schedule('0 8 * * *', 'morning brief', () => runMorningBrief(telegram));
 
   // Evening check-in — 1:00am Tue–Fri (after Mon–Thu work shifts ending at 12:30am)
   schedule('0 1 * * 2-5', 'evening check-in (post-work)', () => runEveningCheckIn(telegram));
@@ -293,7 +318,6 @@ export function startCrons(telegram: Telegram): void {
   schedule('0 18 * * 0', 'weekly digest', () => runWeeklyDigest(telegram));
 
   // Identity pings — rotate through principles across 4 daily slots
-  const sendMessage = (text: string) => telegram.sendMessage(getChatId(), text);
 
   cron.schedule('50 6 * * *', async () => {
     try { await sendMessage(getNextPrinciple()); console.log('[identity] morning ping sent'); }
@@ -315,35 +339,97 @@ export function startCrons(telegram: Telegram): void {
     catch (err) { console.error('[identity] weekend ping failed:', err instanceof Error ? err.message : err); }
   }, { timezone: AUCKLAND });
 
-  // Weekly accountability — Friday 6pm
-  schedule('0 18 * * 5', 'weekly accountability', async () => {
-    const contextPath = join(process.cwd(), 'context-updates.md');
-    const content = existsSync(contextPath) ? readFileSync(contextPath, 'utf-8') : '';
-    const commitments = content
-      .split('\n')
-      .filter(l => l.includes('commitment:') && !l.includes('status: complete'));
+  // Mid-afternoon PM check-in — 12:30pm daily
+  cron.schedule('30 12 * * *', async () => {
+    try {
+      const [overdue, dueToday, active] = await Promise.all([
+        getOverdueCommitments(),
+        getDueTodayCommitments(),
+        getActiveCommitments(),
+      ]);
 
-    if (commitments.length === 0) return;
+      const now = new Date().toLocaleString('en-NZ', {
+        timeZone: AUCKLAND,
+        weekday: 'long',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
 
-    const anthropic = getAnthropicClient();
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 300,
-      system: loadSystemPrompt(),
-      messages: [{
-        role: 'user',
-        content: `it's end of week. these are andrew's active commitments:\n${commitments.join('\n')}\n\nwrite a brief end of week accountability check-in. be direct. flag what's done, what's not, and what needs to happen next week. tone: coach, not judge. max 5 lines.`,
-      }],
-    });
-    const text = response.content.find(b => b.type === 'text');
-    if (text && text.type === 'text') {
-      await telegram.sendMessage(getChatId(), text.text);
-      console.log('[accountability] weekly check-in sent');
+      const prompt = `It is ${now} in Auckland.
+
+Overdue commitments: ${JSON.stringify(overdue)}
+Due today: ${JSON.stringify(dueToday)}
+All active: ${JSON.stringify(active)}
+
+Send Andrew a mid-afternoon PM check-in. Always send something — if nothing is overdue or due today, pick the most important active commitment and ask for a status update.
+
+Rules:
+- Max 3 lines
+- Direct, specific — name the actual commitment
+- If overdue: apply pressure, ask what happened
+- If due today: check if on track
+- If slip_count >= 2: reference the pattern, use benchmark framing
+- If slip_count >= 3: identity challenge
+- No filler, no preamble`;
+
+      const anthropic = getAnthropicClient();
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 200,
+        system: loadSystemPrompt(),
+        messages: [{ role: 'user', content: prompt }],
+      });
+      const text = response.content.find(b => b.type === 'text');
+      if (text && text.type === 'text') {
+        await sendMessage(text.text);
+        console.log('[pm] midday check-in sent');
+      }
+    } catch (err) {
+      console.error('[pm] midday check-in failed:', err instanceof Error ? err.message : err);
     }
-  });
+  }, { timezone: AUCKLAND });
 
-  console.log('[cron] 9 jobs registered (Pacific/Auckland)');
-  console.log('[cron]   morning brief:        0 7 * * *');
+  // Weekly review — Friday 6pm
+  cron.schedule('0 18 * * 5', async () => {
+    try {
+      const [active, overdue] = await Promise.all([
+        getActiveCommitments(),
+        getOverdueCommitments(),
+      ]);
+
+      const prompt = `End of week review for Andrew.
+
+Active commitments: ${JSON.stringify(active)}
+Overdue: ${JSON.stringify(overdue)}
+
+Write a weekly accountability review:
+- What's on track
+- What slipped and how many times
+- Honest assessment of the week
+- What needs to happen next week
+- If multiple slips on same commitment: name the pattern
+- Tone: direct coach, not cheerleader
+- Max 8 lines`;
+
+      const anthropic = getAnthropicClient();
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 400,
+        system: loadSystemPrompt(),
+        messages: [{ role: 'user', content: prompt }],
+      });
+      const text = response.content.find(b => b.type === 'text');
+      if (text && text.type === 'text') {
+        await sendMessage(text.text);
+        console.log('[pm] weekly review sent');
+      }
+    } catch (err) {
+      console.error('[pm] weekly review failed:', err instanceof Error ? err.message : err);
+    }
+  }, { timezone: AUCKLAND });
+
+  console.log('[cron] 10 jobs registered (Pacific/Auckland)');
+  console.log('[cron]   morning brief:        0 8 * * *');
   console.log('[cron]   evening (post-work):  0 1 * * 2-5');
   console.log('[cron]   evening (rest day):   0 22 * * 0,1');
   console.log('[cron]   weekly digest:        0 18 * * 0');
@@ -351,5 +437,6 @@ export function startCrons(telegram: Telegram): void {
   console.log('[cron]   identity (pre-shift): 45 13 * * 1-4');
   console.log('[cron]   identity (post-shift):15 1 * * 2-5');
   console.log('[cron]   identity (weekend):   50 6 * * 5,6,0');
-  console.log('[cron]   accountability:       0 18 * * 5');
+  console.log('[cron]   pm check-in:          30 12 * * *');
+  console.log('[cron]   weekly review:        0 18 * * 5');
 }

@@ -32,6 +32,16 @@ import {
   updateLifeTask,
   deleteLifeTask,
 } from '../integrations/google-tasks';
+import {
+  getGoalTree,
+  addGoal,
+  completeGoal,
+  addCommitment,
+  getActiveCommitments,
+  getOverdueCommitments,
+  completeCommitment,
+  logSlip,
+} from '../integrations/goals';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
@@ -85,6 +95,72 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
       return 'commitment marked complete';
     }
     case 'update_context':           return execUpdateContext(input);
+    case 'get_goal_tree': {
+      const tree = await getGoalTree();
+      return JSON.stringify(tree, null, 2);
+    }
+    case 'add_goal': {
+      const goal = await addGoal({
+        title: input.title as string,
+        description: input.description as string | undefined,
+        parentGoalId: input.parent_goal_id as string | undefined,
+        priority: input.priority as string | undefined,
+        deadline: input.deadline as string | undefined,
+      });
+      console.log('[goals] added:', input.title);
+      return `goal added: ${input.title as string} (id: ${goal.id})`;
+    }
+    case 'complete_goal': {
+      await completeGoal(input.goal_id as string);
+      return 'goal marked complete';
+    }
+    case 'add_commitment': {
+      const commitment = await addCommitment({
+        statement: input.statement as string,
+        goalId: input.goal_id as string | undefined,
+        deadline: input.deadline as string | undefined,
+        source: input.source as string | undefined,
+      });
+      console.log('[commitment] logged:', input.statement);
+      return `commitment logged: "${input.statement as string}" (id: ${commitment.id})`;
+    }
+    case 'get_active_commitments': {
+      const commitments = await getActiveCommitments();
+      if (commitments.length === 0) return 'no active commitments';
+      return commitments.map(c => {
+        const deadline = c.deadline
+          ? new Date(c.deadline).toLocaleDateString('en-NZ', {
+              timeZone: 'Pacific/Auckland',
+              weekday: 'short', month: 'short', day: 'numeric',
+            })
+          : 'no deadline';
+        const goal = c.goals?.title ?? 'no goal linked';
+        const slips = c.slip_count > 0 ? ` (slipped ${c.slip_count}x)` : '';
+        return `[${c.id}] "${c.statement}" — due ${deadline} | ${goal}${slips}`;
+      }).join('\n');
+    }
+    case 'get_overdue_commitments': {
+      const overdue = await getOverdueCommitments();
+      if (overdue.length === 0) return 'no overdue commitments';
+      return overdue.map(c => {
+        const daysOverdue = Math.floor(
+          (Date.now() - new Date(c.deadline!).getTime()) / 86400000,
+        );
+        return `[${c.id}] "${c.statement}" — ${daysOverdue}d overdue | slips: ${c.slip_count}`;
+      }).join('\n');
+    }
+    case 'complete_commitment': {
+      await completeCommitment(input.commitment_id as string);
+      return 'commitment marked complete';
+    }
+    case 'log_slip': {
+      await logSlip({
+        commitmentId: input.commitment_id as string,
+        reason: input.reason as string | undefined,
+        newDeadline: input.new_deadline as string | undefined,
+      });
+      return 'slip logged';
+    }
     case 'fetch_url':                return fetchUrl(input);
     case 'transcribe_audio':         return transcribeAudio(input);
     default:
