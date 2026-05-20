@@ -37,7 +37,7 @@ function getChatId(): string {
 async function generateMessage(prompt: string): Promise<string> {
   const anthropic = getAnthropicClient();
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system: loadSystemPrompt(),
     messages: [{ role: 'user', content: prompt }],
@@ -307,7 +307,7 @@ export function startCrons(telegram: Telegram): void {
 
     const anthropic = getAnthropicClient();
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-4-6',
       max_tokens: 300,
       system: loadSystemPrompt(),
       messages: [{

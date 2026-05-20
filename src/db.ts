@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import type { DbMessage } from './types';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -39,17 +38,3 @@ export async function logMessage(
   if (logError) throw new Error(`Failed to update daily log: ${logError.message}`);
 }
 
-export async function getRecentHistory(chatId: string, days = 14): Promise<DbMessage[]> {
-  const since = new Date();
-  since.setDate(since.getDate() - days);
-
-  const { data, error } = await supabase
-    .from('messages')
-    .select('*')
-    .eq('chat_id', chatId)
-    .gte('created_at', since.toISOString())
-    .order('created_at', { ascending: true });
-
-  if (error) throw new Error(`Failed to fetch history: ${error.message}`);
-  return data ?? [];
-}

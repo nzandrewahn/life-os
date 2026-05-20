@@ -95,7 +95,7 @@ export async function runAgentLoop(
     if (iteration >= MAX_ITERATIONS) throw new Error('Agent loop exceeded maximum iterations');
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       tools: allTools,

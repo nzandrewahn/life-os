@@ -4,9 +4,6 @@ import Anthropic from '@anthropic-ai/sdk';
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-console.log('[notion] client methods:', typeof notion.databases?.query);
-
-
 const WARMUP = 'warm-up: rows of straight lines (horizontal, vertical, 45°, diagonal) then ellipses at different angles. 5 min.';
 
 export interface NotionTask {
@@ -64,7 +61,6 @@ function mapTask(page: Record<string, unknown>): NotionTask {
 
 export async function readNotionTasks(): Promise<NotionTask[]> {
   const dbId = process.env.NOTION_TASKS_DB_ID!;
-  console.log('[notion] querying tasks db:', dbId);
 
   const response = await notion.databases.query({
     database_id: dbId,
@@ -79,9 +75,6 @@ export async function readNotionTasks(): Promise<NotionTask[]> {
   });
 
   console.log('[notion] tasks found:', active.length, 'active (of', response.results.length, 'total)');
-  console.log('[notion] task names:', (active as Record<string, unknown>[]).map(
-    p => ((p.properties as Record<string, Record<string, unknown>>)['Name']?.title as Array<{ plain_text: string }>)?.[0]?.plain_text
-  ));
 
   return (active as Record<string, unknown>[]).map(mapTask);
 }
@@ -140,9 +133,7 @@ export async function writeNotionTask(
   let inferred: InferredFields | null = null;
 
   if (needsInference) {
-    console.log('[notion] inferring fields for task:', title);
     inferred = await inferTaskFields(title);
-    console.log('[notion] inferred:', inferred);
   }
 
   const finalProject = project ?? inferred?.project ?? null;
@@ -165,10 +156,6 @@ export async function writeNotionTask(
     properties: properties as never,
   });
 
-  console.log('[notion] created page id:', page.id);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  console.log('[notion] created page status:', (page as any).properties?.Status);
-
   return { id: page.id, title, project: finalProject, priority: finalPriority, timeEstimate: finalTimeEstimate, energy: finalEnergy };
 }
 
@@ -184,14 +171,6 @@ export async function updateNotionTask(
     why?: string;
   },
 ): Promise<void> {
-  console.log('[notion] updateNotionTask pageId:', pageId);
-  console.log('[notion] name provided:', fields.name);
-  console.log('[notion] priority provided:', fields.priority);
-  console.log('[notion] energy provided:', fields.energy);
-  console.log('[notion] timeEstimate provided:', fields.timeEstimate);
-  console.log('[notion] project provided:', fields.project);
-  console.log('[notion] why provided:', fields.why);
-
   const properties: Record<string, unknown> = {};
   if (fields.name)                  properties['Name']          = { title: [{ text: { content: fields.name } }] };
   if (fields.status)                properties['Status']        = { status: { name: fields.status } };
@@ -201,10 +180,7 @@ export async function updateNotionTask(
   if (fields.timeEstimate != null)  properties['Time Estimate'] = { number: fields.timeEstimate };
   if (fields.why)                   properties['Why']           = { rich_text: [{ text: { content: fields.why } }] };
 
-  console.log('[notion] updateNotionTask props:', JSON.stringify(properties, null, 2));
-
-  const response = await notion.pages.update({ page_id: pageId, properties: properties as never });
-  console.log('[notion] update response:', JSON.stringify(response, null, 2));
+  await notion.pages.update({ page_id: pageId, properties: properties as never });
 }
 
 // ─── Sketching ────────────────────────────────────────────────────────────────
@@ -230,8 +206,6 @@ export async function readSketchingToday(): Promise<SketchingSession | { complet
     ],
     page_size: 1,
   });
-
-  console.log('[notion] readSketchingToday raw response:', JSON.stringify(response).slice(0, 500));
 
   if (!response.results.length) {
     return { completed: true, message: 'all sketching sessions completed — programme finished!' };

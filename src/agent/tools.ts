@@ -14,7 +14,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'write_notion_task',
     description:
-      'Create a new task in the Andrew Task Board in Notion and returns its page_id for immediate use in follow-up updates. Use for ALL project tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, and any other project work. Do NOT use write_supabase_life_task for project tasks.',
+      'Create a new task in the Andrew Task Board in Notion and returns its page_id for immediate use in follow-up updates. Use for ALL project tasks — Lost Marbles, Abstracted Objects, Blender, Sketching, and any other project work. Do NOT use write_life_task for project tasks.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -131,7 +131,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'read_supabase_history',
     description:
-      'Read recent conversation and energy logs from Supabase. Returns messages from the last N days. Use this during morning briefs to understand recent context — what was deferred, what energy levels have been, what is in progress.',
+      'Read historical conversation messages from Supabase. Use for retrospective lookup beyond the current in-memory session — e.g. "what did we discuss last week?", "what was I working on 3 days ago?". Do NOT use for morning briefs — those use the current session context. Default 3 days; use up to 14 for broader lookback.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -141,38 +141,6 @@ export const TOOLS: Anthropic.Tool[] = [
         },
       },
       required: [],
-    },
-  },
-  {
-    name: 'write_supabase_capture',
-    description:
-      'Log a raw capture to Supabase with metadata. Call this for every incoming message that goes through the capture pipeline — before routing. Stores the original content, type, classification, and where it was routed.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        raw_content: { type: 'string', description: 'Original message content.' },
-        content_type: {
-          type: 'string',
-          enum: ['link', 'text', 'voice', 'image'],
-          description: 'Type of capture.',
-        },
-        summary: { type: 'string', description: 'One-line summary.' },
-        classification: {
-          type: 'string',
-          enum: ['idea', 'task', 'reference', 'inspiration', 'noise'],
-          description: 'How the capture was classified.',
-        },
-        project: {
-          type: 'string',
-          description: 'Related project if applicable.',
-        },
-        routed_to: {
-          type: 'string',
-          enum: ['notion', 'obsidian', 'life_tasks', 'discarded'],
-          description: 'Where the capture was routed.',
-        },
-      },
-      required: ['raw_content', 'content_type', 'classification', 'routed_to'],
     },
   },
   {
@@ -231,36 +199,6 @@ export const TOOLS: Anthropic.Tool[] = [
         task_id: { type: 'string', description: 'Google Tasks task ID from read_life_tasks.' },
       },
       required: ['task_id'],
-    },
-  },
-  {
-    name: 'write_supabase_life_task',
-    description:
-      'Create a life task in Supabase. Use for personal, logistical, non-project tasks — errands, admin, health, groceries, personal appointments. Always call create_reminder immediately after this tool — these two are always called together. Do NOT use for project tasks; those go to write_notion_task.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        title: { type: 'string', description: 'Task title.' },
-        category: {
-          type: 'string',
-          enum: ['errands', 'admin', 'health', 'personal'],
-          description: 'Life task category.',
-        },
-        time_estimate: {
-          type: 'number',
-          description: 'Optional estimated hours.',
-        },
-        priority: {
-          type: 'string',
-          enum: ['high', 'normal', 'low'],
-          description: 'Priority level.',
-        },
-        due_date: {
-          type: 'string',
-          description: 'Optional due date (YYYY-MM-DD).',
-        },
-      },
-      required: ['title', 'category', 'priority'],
     },
   },
   {
@@ -357,7 +295,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'create_reminder',
     description:
-      'Create a reminder in Apple Reminders via CalDAV. Always call this immediately after write_supabase_life_task — these two tools are always called as a pair for life tasks. Do not call this for project tasks.',
+      'Create a reminder in Apple Reminders via CalDAV. Use when Andrew explicitly asks for an Apple Reminders notification (as opposed to a Google Tasks todo). For most life task and reminder needs, prefer write_life_task instead — it shows natively on the phone and persists across restarts. Do not use for project tasks.',
     input_schema: {
       type: 'object' as const,
       properties: {

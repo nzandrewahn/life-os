@@ -46,8 +46,6 @@ export async function executeTool(name: string, input: ToolInput): Promise<unkno
     case 'write_notion_task':        return execWriteNotionTask(input);
     case 'update_notion_task_status': return execUpdateNotionTask(input);
     case 'read_supabase_history':    return readSupabaseHistory(input);
-    case 'write_supabase_capture':   return writeSupabaseCapture(input);
-    case 'write_supabase_life_task': return writeSupabaseLifeTask(input);
     case 'read_obsidian_index':      return execReadObsidianIndex(input);
     case 'write_obsidian_note':      return execWriteObsidianNote(input);
     case 'update_obsidian_note':     return execUpdateObsidianNote(input);
@@ -174,15 +172,6 @@ async function execWriteNotionTask(input: ToolInput) {
 }
 
 async function execUpdateNotionTask(input: ToolInput) {
-  console.log('[update] raw input:', JSON.stringify(input));
-  console.log('[update] page_id:', input.page_id);
-  console.log('[update] name:', input.name);
-  console.log('[update] status:', input.status);
-  console.log('[update] priority:', input.priority);
-  console.log('[update] energy:', input.energy);
-  console.log('[update] time_estimate:', input.time_estimate);
-  console.log('[update] project:', input.project);
-  console.log('[update] why:', input.why);
   await updateNotionTask(input.page_id as string, {
     name:         input.name          as string | undefined,
     status:       input.status        as string | undefined,
@@ -209,33 +198,6 @@ async function readSupabaseHistory(input: ToolInput) {
     .order('created_at', { ascending: true });
   if (error) throw new Error(`messages query failed: ${error.message}`);
   return { days_requested: days, messages: data ?? [] };
-}
-
-async function writeSupabaseCapture(input: ToolInput) {
-  const { error } = await supabase.from('captures').insert({
-    raw_content: input.raw_content,
-    content_type: input.content_type,
-    summary: input.summary ?? null,
-    classification: input.classification,
-    project: input.project ?? null,
-    routed_to: input.routed_to,
-    reviewed: false,
-  });
-  if (error) throw new Error(`captures insert: ${error.message}`);
-  return { success: true, message: 'capture logged' };
-}
-
-async function writeSupabaseLifeTask(input: ToolInput) {
-  const { data, error } = await supabase.from('life_tasks').insert({
-    title: input.title,
-    category: input.category,
-    time_estimate: input.time_estimate ?? null,
-    priority: input.priority ?? 'normal',
-    due_date: input.due_date ?? null,
-    status: 'pending',
-  }).select('id').single();
-  if (error) throw new Error(`life_tasks insert failed: ${error.message}`);
-  return { success: true, id: data.id, title: input.title, message: `life task "${input.title}" created` };
 }
 
 async function execReadObsidianIndex(input: ToolInput) {
