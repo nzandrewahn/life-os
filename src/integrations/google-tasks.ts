@@ -25,6 +25,27 @@ function getClient() {
 
 console.log('[google-tasks] integration ready');
 
+function formatTaskTitle(title: string, due?: string): string {
+  if (!due) return title;
+  const dueDate = new Date(due);
+  const hasTime =
+    due.includes('T') &&
+    !due.endsWith('T00:00:00.000Z') &&
+    !(dueDate.getHours() === 0 && dueDate.getMinutes() === 0);
+  if (!hasTime) return title;
+  const timeStr = dueDate.toLocaleTimeString('en-NZ', {
+    timeZone: 'Pacific/Auckland',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `${title} @ ${timeStr}`;
+}
+
+function formatDueDate(due?: string): string | undefined {
+  if (!due) return undefined;
+  return new Date(due).toISOString().split('T')[0] + 'T00:00:00.000Z';
+}
+
 export async function readLifeTasks(): Promise<LifeTask[]> {
   const client = getClient();
   const res = await client.tasks.list({
@@ -44,30 +65,12 @@ export async function readLifeTasks(): Promise<LifeTask[]> {
 
 export async function writeLifeTask(title: string, notes?: string, due?: string): Promise<string> {
   const client = getClient();
-
-  let taskTitle = title;
-  if (due) {
-    const hasTime = due.includes('T') && !due.endsWith('T00:00:00') && !due.endsWith('T00:00:00.000Z');
-    if (hasTime) {
-      const timeStr = new Date(due).toLocaleTimeString('en-NZ', {
-        timeZone: 'Pacific/Auckland',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      taskTitle = `${title} @ ${timeStr}`;
-    }
-  }
-
-  const dueFormatted = due
-    ? new Date(due).toISOString().split('T')[0] + 'T00:00:00.000Z'
-    : undefined;
-
   const res = await client.tasks.insert({
     tasklist: '@default',
     requestBody: {
-      title: taskTitle,
+      title: formatTaskTitle(title, due),
       notes: notes ?? undefined,
-      ...(dueFormatted && { due: dueFormatted }),
+      ...(formatDueDate(due) && { due: formatDueDate(due) }),
     },
   });
   return res.data.id ?? '';
@@ -87,13 +90,20 @@ export async function updateLifeTask(
   params: { title?: string; notes?: string; due?: string }
 ): Promise<LifeTask> {
   const client = getClient();
+
+  let taskTitle = params.title;
+  if (params.due && !params.title) {
+    const existing = await client.tasks.get({ tasklist: '@default', task: taskId });
+    taskTitle = existing.data.title ?? '';
+  }
+
   const res = await client.tasks.patch({
     tasklist: '@default',
     task: taskId,
     requestBody: {
-      ...(params.title && { title: params.title }),
+      ...(taskTitle !== undefined && { title: formatTaskTitle(taskTitle, params.due) }),
       ...(params.notes && { notes: params.notes }),
-      ...(params.due && { due: params.due }),
+      ...(params.due && { due: formatDueDate(params.due) }),
     },
   });
   return {
