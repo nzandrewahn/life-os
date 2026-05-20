@@ -319,7 +319,7 @@ export function startCrons(telegram: Telegram): void {
 
   // Identity pings — rotate through principles across 4 daily slots
 
-  cron.schedule('50 6 * * *', async () => {
+  cron.schedule('0 10 * * *', async () => {
     try { await sendMessage(getNextPrinciple()); console.log('[identity] morning ping sent'); }
     catch (err) { console.error('[identity] morning ping failed:', err instanceof Error ? err.message : err); }
   }, { timezone: AUCKLAND });
@@ -332,11 +332,6 @@ export function startCrons(telegram: Telegram): void {
   cron.schedule('15 1 * * 2-5', async () => {
     try { await sendMessage(getNextPrinciple()); console.log('[identity] post-shift ping sent'); }
     catch (err) { console.error('[identity] post-shift ping failed:', err instanceof Error ? err.message : err); }
-  }, { timezone: AUCKLAND });
-
-  cron.schedule('50 6 * * 5,6,0', async () => {
-    try { await sendMessage(getNextPrinciple()); console.log('[identity] weekend ping sent'); }
-    catch (err) { console.error('[identity] weekend ping failed:', err instanceof Error ? err.message : err); }
   }, { timezone: AUCKLAND });
 
   // Mid-afternoon PM check-in — 12:30pm daily
@@ -428,15 +423,14 @@ Write a weekly accountability review:
     }
   }, { timezone: AUCKLAND });
 
-  console.log('[cron] 10 jobs registered (Pacific/Auckland)');
+  console.log('[cron] 9 jobs registered (Pacific/Auckland)');
   console.log('[cron]   morning brief:        0 8 * * *');
   console.log('[cron]   evening (post-work):  0 1 * * 2-5');
   console.log('[cron]   evening (rest day):   0 22 * * 0,1');
   console.log('[cron]   weekly digest:        0 18 * * 0');
-  console.log('[cron]   identity (morning):   50 6 * * *');
+  console.log('[cron]   identity (morning):   0 10 * * *');
   console.log('[cron]   identity (pre-shift): 45 13 * * 1-4');
   console.log('[cron]   identity (post-shift):15 1 * * 2-5');
-  console.log('[cron]   identity (weekend):   50 6 * * 5,6,0');
   console.log('[cron]   pm check-in:          30 12 * * *');
   console.log('[cron]   weekly review:        0 18 * * 5');
 }
